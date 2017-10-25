@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Situative Music Recommender</string>
+    <string name="create_database">Login to Spotify</string>
+</resources>
