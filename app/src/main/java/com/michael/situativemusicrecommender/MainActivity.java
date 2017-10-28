@@ -66,6 +66,7 @@ import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -75,6 +76,7 @@ import kaaes.spotify.webapi.android.models.AlbumSimple;
 import kaaes.spotify.webapi.android.models.AlbumsPager;
 import kaaes.spotify.webapi.android.models.Artist;
 import kaaes.spotify.webapi.android.models.ArtistsPager;
+import kaaes.spotify.webapi.android.models.AudioFeaturesTrack;
 import kaaes.spotify.webapi.android.models.Track;
 import kaaes.spotify.webapi.android.models.TracksPager;
 import retrofit.Callback;
@@ -98,6 +100,7 @@ public class MainActivity extends AppCompatActivity implements
     static MainActivity itself;
 
     public static final String REDIRECT_URI = "michael-situativemusicrecommender://callback";
+    private DBHelper mydb;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,43 +135,46 @@ public class MainActivity extends AppCompatActivity implements
                 AuthenticationClient.openLoginInBrowser(this, request);
             }
         } else {
-            Config playerConfig = new Config(this, pref.getString("AccessToken", ""), CLIENT_ID);
-            Spotify.getPlayer(playerConfig, this, new SpotifyPlayer.InitializationObserver() {
-                @Override
-                public void onInitialized(SpotifyPlayer spotifyPlayer) {
-                    mPlayer = spotifyPlayer;
-                    mPlayer.addConnectionStateCallback(MainActivity.this);
-                    mPlayer.addNotificationCallback(MainActivity.this);
-                    Log.d("Player", "has been set");
-                }
-
-                @Override
-                public void onError(Throwable throwable) {
-                    Log.e("MainActivity", "Could not initialize player: " + throwable.getMessage());
-                }
-            });
+            buildPlayer();
         }
+    }
+
+    private void buildPlayer() {
+        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+        Config playerConfig = new Config(this, pref.getString("AccessToken", ""), CLIENT_ID);
+        Spotify.getPlayer(playerConfig, this, new SpotifyPlayer.InitializationObserver() {
+            @Override
+            public void onInitialized(SpotifyPlayer spotifyPlayer) {
+                mPlayer = spotifyPlayer;
+                mPlayer.addConnectionStateCallback(MainActivity.this);
+                mPlayer.addNotificationCallback(MainActivity.this);
+                Log.d("Player", "has been set");
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                Log.e("MainActivity", "Could not initialize player: " + throwable.getMessage());
+            }
+        });
     }
 
     private void prepLayout() {
         final EditText edittext = (EditText) findViewById(R.id.search_text);
         edittext.setSingleLine(true);
-        edittext.setOnKeyListener(new View.OnKeyListener() {
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                // If the event is a key-down event on the "enter" button
-                if ((event.getAction() == KeyEvent.ACTION_DOWN) &&
-                        (keyCode == KeyEvent.KEYCODE_ENTER)) {
-                    // Perform action on key press
-                    Toast.makeText(MainActivity.this, edittext.getText(), Toast.LENGTH_SHORT).show();
-                    edittext.clearFocus();
-                    edittext.setCursorVisible(false);
-                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                    imm.hideSoftInputFromWindow(edittext.getWindowToken(), 0);
-                    search(edittext.getText().toString());
-                    return true;
-                }
-                return false;
+        edittext.setOnKeyListener((v, keyCode, event) -> {
+            // If the event is a key-down event on the "enter" button
+            if ((event.getAction() == KeyEvent.ACTION_DOWN) &&
+                    (keyCode == KeyEvent.KEYCODE_ENTER)) {
+                // Perform action on key press
+                Toast.makeText(MainActivity.this, edittext.getText(), Toast.LENGTH_SHORT).show();
+                edittext.clearFocus();
+                edittext.setCursorVisible(false);
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(edittext.getWindowToken(), 0);
+                search(edittext.getText().toString());
+                return true;
             }
+            return false;
         });
 
 
@@ -362,7 +368,7 @@ public class MainActivity extends AppCompatActivity implements
                 break;
             case R.id.Button3:
                 if (isNetworkAvailable()) {
-                    printLocation();
+                    getLocationType();
                 }
                 break;
             case R.id.play_button:
@@ -466,7 +472,7 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    private void printLocation() {
+    private void getLocationType() {
         new RetrieveFeedTask().execute();
     }
 
@@ -557,22 +563,13 @@ public class MainActivity extends AppCompatActivity implements
                 // Response was successful and contains auth token
                 case TOKEN:
                     // Handle successful response
-                    accessToken = response.getAccessToken();
-                    Config playerConfig = new Config(this, response.getAccessToken(), CLIENT_ID);
-                    Spotify.getPlayer(playerConfig, this, new SpotifyPlayer.InitializationObserver() {
-                        @Override
-                        public void onInitialized(SpotifyPlayer spotifyPlayer) {
-                            mPlayer = spotifyPlayer;
-                            mPlayer.addConnectionStateCallback(MainActivity.this);
-                            mPlayer.addNotificationCallback(MainActivity.this);
-                            Log.d("Player", "has been set");
-                        }
-
-                        @Override
-                        public void onError(Throwable throwable) {
-                            Log.e("MainActivity", "Could not initialize player: " + throwable.getMessage());
-                        }
-                    });
+                    SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+                    SharedPreferences.Editor edit = pref.edit();
+                    edit.putString("AccessToken", accessToken);
+                    edit.putInt("AccessToken_ExpirationSeconds", response.getExpiresIn());
+                    edit.putInt("AccessToken_StorageTime", (int) Calendar.getInstance().getTimeInMillis() / 1000);
+                    edit.apply();
+                    buildPlayer();
                     break;
 
                 // Auth flow returned an error
@@ -605,21 +602,7 @@ public class MainActivity extends AppCompatActivity implements
                     edit.putInt("AccessToken_ExpirationSeconds", response.getExpiresIn());
                     edit.putInt("AccessToken_StorageTime", (int) Calendar.getInstance().getTimeInMillis() / 1000);
                     edit.apply();
-                    Config playerConfig = new Config(this, response.getAccessToken(), CLIENT_ID);
-                    Spotify.getPlayer(playerConfig, this, new SpotifyPlayer.InitializationObserver() {
-                        @Override
-                        public void onInitialized(SpotifyPlayer spotifyPlayer) {
-                            mPlayer = spotifyPlayer;
-                            mPlayer.addConnectionStateCallback(MainActivity.this);
-                            mPlayer.addNotificationCallback(MainActivity.this);
-                            Log.d("Player", "has been set");
-                        }
-
-                        @Override
-                        public void onError(Throwable throwable) {
-                            Log.e("MainActivity", "Could not initialize player: " + throwable.getMessage());
-                        }
-                    });
+                    buildPlayer();
                     break;
 
                 // Auth flow returned an error
@@ -635,16 +618,13 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     void printResults(Map<String, RecommendationBuilder.ArtistRecommendation> recommendationsMap) {
-        this.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                final ListView listview = (ListView) findViewById(R.id.listview);
-                ArrayList<RecommendationBuilder.ArtistRecommendation> recommendations = new ArrayList<>(recommendationsMap.values());
-                recommendations.sort(new RecommendationBuilder.ArtistRecommendationComparator());
-                ArtistArrayAdapter adapter = new ArtistArrayAdapter(getContext(), recommendations);
-                listview.setAdapter(adapter);
-                adapter.notifyDataSetChanged();
-            }
+        this.runOnUiThread(() -> {
+            final ListView listview = (ListView) findViewById(R.id.listview);
+            ArrayList<RecommendationBuilder.ArtistRecommendation> recommendations = new ArrayList<>(recommendationsMap.values());
+            recommendations.sort(new RecommendationBuilder.ArtistRecommendationComparator());
+            ArtistArrayAdapter adapter = new ArtistArrayAdapter(getContext(), recommendations);
+            listview.setAdapter(adapter);
+            adapter.notifyDataSetChanged();
         });
     }
 
@@ -761,11 +741,7 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     private void constructDB() {
-        DBHelper mydb = new DBHelper(this);
-        Calendar cal = new GregorianCalendar();
-        cal.set(2017, 8, 17);
-        Date date = cal.getTime();
-        mydb.insertTrackHistory("Kalmah", "2YPVtFn6SsYNntkmrdDpGF", "3oNkd3uj2phyrtZCmvtN6c", 1, 1f, date);
+        mydb = new DBHelper(this);
     }
 
     private boolean isNetworkAvailable() {
@@ -829,7 +805,10 @@ public class MainActivity extends AppCompatActivity implements
         Log.d("MainActivity", "Playback event received: " + playerEvent.name());
         switch (playerEvent) {
             case kSpPlaybackNotifyTrackChanged:
+                finishCurrentSong();
                 Metadata metadata = mPlayer.getMetadata();
+                Log.d("Started Track", metadata.toString());
+                startSong(metadata);
                 TextView songName = (TextView) findViewById(R.id.song_name);
                 songName.setText(metadata.currentTrack.name);
                 TextView artistName = (TextView) findViewById(R.id.artist_name);
@@ -841,12 +820,139 @@ public class MainActivity extends AppCompatActivity implements
                 }
                 break;
             // Handle event type as necessary
+            case kSpPlaybackNotifyPause:
+                currentSong.pause();
+                metadata = mPlayer.getMetadata();
+                Log.d("Paused Track", metadata.toString());
+                ImageView playButton = (ImageView) findViewById(R.id.play_button);
+                playButton.setImageDrawable(getDrawable(R.drawable.ic_action_name));
+                break;
+            case kSpPlaybackNotifyPlay:
+                currentSong.play();
             default:
                 break;
         }
     }
 
-    private class DownloadImageTask extends AsyncTask<URL, Void, Bitmap> {
+    private class Song{
+
+        String artistName;
+        String artistUri;
+        long durationMs;
+        String name;
+        String uri;
+        ArrayList<Long> startTimes;
+        ArrayList<Long> endTimes;
+
+        Song(Metadata.Track currentTrack) {
+            artistName = currentTrack.artistName;
+            artistUri = currentTrack.artistUri;
+            durationMs = currentTrack.durationMs;
+            name = currentTrack.name;
+            uri = currentTrack.uri;
+            startTimes = new ArrayList<>();
+            endTimes = new ArrayList<>();
+        }
+
+        void play() {
+            startTimes.add(GregorianCalendar.getInstance().getTimeInMillis() / 1000);
+        }
+
+        void pause() {
+            endTimes.add(GregorianCalendar.getInstance().getTimeInMillis() / 1000);
+        }
+
+        long getPlaytime() {
+            long time = 0;
+            for (Long l: endTimes){
+                time += l;
+            }
+            for (Long l: startTimes){
+                time -= l;
+            }
+            return time;
+        }
+    }
+
+    Song currentSong;
+
+    private void startSong(Metadata metadata) {
+        currentSong = new Song(metadata.currentTrack);
+    }
+
+    private void finishCurrentSong() {
+        try {
+            float fractionListenedTo = (float) (currentSong.getPlaytime()) / (currentSong.durationMs / 1000);
+            System.out.println("Finished song " + currentSong.name + " by " + currentSong.artistName + " after " + fractionListenedTo + " of the duration");
+            stackSong(currentSong, fractionListenedTo);
+        } catch (Exception ignored){}
+    }
+
+    private void stackSong(Song currentSong, float fractionListenedTo) {
+        new Thread(() -> {
+            try {
+                SpotifyApi api = new SpotifyApi();
+                accessToken = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", "");
+                if (!accessToken.equals("")) {
+                    api.setAccessToken(PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", ""));
+                    SpotifyService spotify = api.getService();
+                    String artistId = currentSong.artistUri.split(":")[2];
+                    Artist artist = spotify.getArtist(artistId);
+                    ArrayList<String> genres = (ArrayList<String>) artist.genres;
+                    System.out.println(genres.toString());
+
+                    int tagId = 0;
+                    Map<String, String> locationIds = OSMWrapperAPI.getLocationType();
+                    if (locationIds != null) {
+                        for (Object o : locationIds.entrySet()) {
+                            Map.Entry entry = (Map.Entry) o;
+                            tagId = dictionary.checkForTagId(entry);
+                            System.out.println("Location Tag ID:" + tagId);
+                        }
+                    }
+                    System.out.println(tagId);
+
+                    long timeInMillis = GregorianCalendar.getInstance().getTimeInMillis();
+                    System.out.println(timeInMillis);
+
+                    int age = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getInt("Age", 20);
+                    System.out.println(age);
+
+                    String gender = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("Gender", "female");
+                    System.out.println(gender);
+
+                    String trackId = currentSong.uri.split(":")[2];
+                    AudioFeaturesTrack audioFeatures = spotify.getTrackAudioFeatures(trackId);
+                    float danceability = audioFeatures.danceability;
+                    float acousticness = audioFeatures.acousticness;
+                    float energy = audioFeatures.energy;
+                    float instrumentalness = audioFeatures.instrumentalness;
+                    float liveness = audioFeatures.liveness;
+                    float loudness = audioFeatures.loudness;
+                    float speechiness = audioFeatures.speechiness;
+                    float tempo = audioFeatures.tempo;
+                    int timeSignature = audioFeatures.time_signature;
+                    float valence = audioFeatures.valence;
+                    int key = audioFeatures.key;
+                    int mode = audioFeatures.mode;
+                    int duration = audioFeatures.duration_ms;
+
+                    Date now = GregorianCalendar.getInstance().getTime();
+                    String timeString = now.getDay() + " " + now.getHours() + ":" + now.getMinutes();
+                    TrackRecord trackRecord = new TrackRecord(new UserRecord(age, gender), new ArtistRecord(artist.name, artistId, genres), new SongRecord(currentSong.name, trackId, danceability, energy, key, loudness, mode, speechiness, acousticness, instrumentalness, liveness, valence, tempo, duration, timeSignature), timeString, tagId, fractionListenedTo);
+
+                    if (mydb!=null){
+                        mydb.insertTrackHistory(trackRecord);
+                    }
+                    // TODO: Store all of this in a row in a database
+                }
+            } catch (IOException | SAXException | ParserConfigurationException e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    private  class DownloadImageTask extends AsyncTask<URL, Void, Bitmap> {
         ImageView bmImage;
 
         DownloadImageTask() {
@@ -878,6 +984,82 @@ public class MainActivity extends AppCompatActivity implements
             // Handle error type as necessary
             default:
                 break;
+        }
+    }
+
+    class TrackRecord{
+        UserRecord user;
+        ArtistRecord artist;
+        SongRecord song;
+        String time;
+        int locationId;
+        float weight;
+
+        TrackRecord(UserRecord user, ArtistRecord artist, SongRecord song, String time, int locationId, float weight){
+            this.user = user;
+            this.artist = artist;
+            this.song = song;
+            this.time = time;
+            this.locationId = locationId;
+            this.weight = weight;
+        }
+    }
+
+    class UserRecord{
+        int age;
+        String gender;
+
+        UserRecord(int age, String gender){
+            this.age = age;
+            this.gender = gender;
+        }
+    }
+
+    class ArtistRecord{
+        String name;
+        String id;
+        ArrayList<String> genres;
+
+        ArtistRecord(String name, String id, ArrayList<String> genres){
+            this.name = name;
+            this.id = id;
+            this.genres = genres;
+        }
+    }
+
+    class SongRecord{
+        String name;
+        String id;
+        float danceability;
+        float energy;
+        int key;
+        float loudness;
+        int mode;
+        float speechiness;
+        float acousticness;
+        float instrumentalness;
+        float liveness;
+        float valence;
+        float tempo;
+        int duration;
+        int timeSignature;
+
+        SongRecord(String name, String id, float danceability, float energy, int key, float loudness, int mode, float speechiness, float acousticness, float instrumentalness, float liveness, float valence, float tempo, int duration, int timeSignature){
+            this.acousticness = acousticness;
+            this.danceability = danceability;
+            this.duration = duration;
+            this.energy = energy;
+            this.id = id;
+            this.instrumentalness = instrumentalness;
+            this.key = key;
+            this.liveness = liveness;
+            this.loudness = loudness;
+            this.mode = mode;
+            this.name = name;
+            this.speechiness = speechiness;
+            this.tempo = tempo;
+            this.timeSignature = timeSignature;
+            this.valence = valence;
         }
     }
 }
