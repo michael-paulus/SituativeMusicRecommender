@@ -66,7 +66,6 @@ import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -88,7 +87,6 @@ public class MainActivity extends AppCompatActivity implements
 
     private static final int MY_PERMISSIONS_REQUEST_ACCESS_LOCATION = 42;
     private static final String CLIENT_ID = "deaa15968cb84bf09fdd25034b520033";
-    RecommendationBuilder recommendationBuilder;
     private LocationManager locationManager;
     private LocationListener locationListener;
     public static final String TYPE_PLAYLIST = "Playlist";
@@ -114,7 +112,6 @@ public class MainActivity extends AppCompatActivity implements
 
         prepLayout();
 
-        recommendationBuilder = new RecommendationBuilder();
         setLocationListener();
     }
 
@@ -617,17 +614,6 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    void printResults(Map<String, RecommendationBuilder.ArtistRecommendation> recommendationsMap) {
-        this.runOnUiThread(() -> {
-            final ListView listview = (ListView) findViewById(R.id.listview);
-            ArrayList<RecommendationBuilder.ArtistRecommendation> recommendations = new ArrayList<>(recommendationsMap.values());
-            recommendations.sort(new RecommendationBuilder.ArtistRecommendationComparator());
-            ArtistArrayAdapter adapter = new ArtistArrayAdapter(getContext(), recommendations);
-            listview.setAdapter(adapter);
-            adapter.notifyDataSetChanged();
-        });
-    }
-
     public static String getAccessToken() {
         return accessToken;
     }
@@ -701,47 +687,9 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    private class ArtistArrayAdapter extends ArrayAdapter<RecommendationBuilder.ArtistRecommendation> {
-
-        private final Context context;
-
-        public ArtistArrayAdapter(Context context, List<RecommendationBuilder.ArtistRecommendation> objects) {
-            super(context, -1, objects);
-            this.context = context;
-        }
-
-
-        public String getArtistId(int position) {
-            return getItem(position).artistID;
-
-        }
-
-        public String getArtistName(int position) {
-            return getItem(position).artistName;
-        }
-
-        public String getArtistWeight(int position) {
-            return String.valueOf(getItem(position).weight);
-        }
-
-        @NonNull
-        @Override
-        public View getView(int position, View convertView, @NonNull ViewGroup parent) {
-            LayoutInflater inflater = (LayoutInflater) context
-                    .getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-            View rowView = inflater.inflate(R.layout.artist_list_element, parent, false);
-            TextView firstLine = (TextView) rowView.findViewById(R.id.firstLine);
-            TextView secondLine = (TextView) rowView.findViewById(R.id.secondLine);
-            ImageView imageView = (ImageView) rowView.findViewById(R.id.icon);
-            firstLine.setText(getArtistName(position));
-            secondLine.setText("Weight: " + getArtistWeight(position));
-
-            return rowView;
-        }
-    }
-
     private void constructDB() {
         mydb = new DBHelper(this);
+        mydb.getWritableDatabase();
     }
 
     private boolean isNetworkAvailable() {
@@ -889,67 +837,71 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     private void stackSong(Song currentSong, float fractionListenedTo) {
-        new Thread(() -> {
-            try {
-                SpotifyApi api = new SpotifyApi();
-                accessToken = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", "");
-                if (!accessToken.equals("")) {
-                    api.setAccessToken(PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", ""));
-                    SpotifyService spotify = api.getService();
-                    String artistId = currentSong.artistUri.split(":")[2];
-                    Artist artist = spotify.getArtist(artistId);
-                    ArrayList<String> genres = (ArrayList<String>) artist.genres;
-                    System.out.println(genres.toString());
+        if (fractionListenedTo != 0.0) {
+            new Thread(() -> {
+                try {
+                    SpotifyApi api = new SpotifyApi();
+                    accessToken = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", "");
+                    checkIfIdTokenStillValid();
+                    if (!accessToken.equals("")) {
+                        api.setAccessToken(PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", ""));
+                        SpotifyService spotify = api.getService();
+                        String artistId = currentSong.artistUri.split(":")[2];
+                        Artist artist = spotify.getArtist(artistId);
+                        ArrayList<String> genres = (ArrayList<String>) artist.genres;
+                        System.out.println(genres.toString());
 
-                    int tagId = 0;
-                    Map<String, String> locationIds = OSMWrapperAPI.getLocationType();
-                    if (locationIds != null) {
-                        for (Object o : locationIds.entrySet()) {
-                            Map.Entry entry = (Map.Entry) o;
-                            tagId = dictionary.checkForTagId(entry);
-                            System.out.println("Location Tag ID:" + tagId);
+                        int tagId = 0;
+                        Map<String, String> locationIds = OSMWrapperAPI.getLocationType();
+                        if (locationIds != null) {
+                            for (Object o : locationIds.entrySet()) {
+                                Map.Entry entry = (Map.Entry) o;
+                                tagId = dictionary.checkForTagId(entry);
+                                System.out.println("Location Tag ID:" + tagId);
+                            }
                         }
+                        System.out.println(tagId);
+
+                        long timeInMillis = GregorianCalendar.getInstance().getTimeInMillis();
+                        System.out.println(timeInMillis);
+
+                        int age = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getInt("Age", 20);
+                        System.out.println(age);
+
+                        String gender = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("Gender", "female");
+                        System.out.println(gender);
+
+                        String trackId = currentSong.uri.split(":")[2];
+                        AudioFeaturesTrack audioFeatures = spotify.getTrackAudioFeatures(trackId);
+                        float danceability = audioFeatures.danceability;
+                        float acousticness = audioFeatures.acousticness;
+                        float energy = audioFeatures.energy;
+                        float instrumentalness = audioFeatures.instrumentalness;
+                        float liveness = audioFeatures.liveness;
+                        float loudness = audioFeatures.loudness;
+                        float speechiness = audioFeatures.speechiness;
+                        float tempo = audioFeatures.tempo;
+                        int timeSignature = audioFeatures.time_signature;
+                        float valence = audioFeatures.valence;
+                        int key = audioFeatures.key;
+                        int mode = audioFeatures.mode;
+                        int duration = audioFeatures.duration_ms;
+
+                        Date now = GregorianCalendar.getInstance().getTime();
+                        String timeString = now.getDay() + " " + now.getHours() + ":" + now.getMinutes();
+                        TrackRecord trackRecord = new TrackRecord(new UserRecord(age, gender), new ArtistRecord(artist.name, artistId, genres), new SongRecord(currentSong.name, trackId, danceability, energy, key, loudness, mode, speechiness, acousticness, instrumentalness, liveness, valence, tempo, duration, timeSignature), timeString, tagId, fractionListenedTo);
+
+                        if (mydb != null) {
+                            mydb.insertTrackHistory(trackRecord);
+                        }
+                        mydb.getTrackRecordsForSituation(1);
+                        // TODO: Store all of this in a row in a database
                     }
-                    System.out.println(tagId);
-
-                    long timeInMillis = GregorianCalendar.getInstance().getTimeInMillis();
-                    System.out.println(timeInMillis);
-
-                    int age = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getInt("Age", 20);
-                    System.out.println(age);
-
-                    String gender = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("Gender", "female");
-                    System.out.println(gender);
-
-                    String trackId = currentSong.uri.split(":")[2];
-                    AudioFeaturesTrack audioFeatures = spotify.getTrackAudioFeatures(trackId);
-                    float danceability = audioFeatures.danceability;
-                    float acousticness = audioFeatures.acousticness;
-                    float energy = audioFeatures.energy;
-                    float instrumentalness = audioFeatures.instrumentalness;
-                    float liveness = audioFeatures.liveness;
-                    float loudness = audioFeatures.loudness;
-                    float speechiness = audioFeatures.speechiness;
-                    float tempo = audioFeatures.tempo;
-                    int timeSignature = audioFeatures.time_signature;
-                    float valence = audioFeatures.valence;
-                    int key = audioFeatures.key;
-                    int mode = audioFeatures.mode;
-                    int duration = audioFeatures.duration_ms;
-
-                    Date now = GregorianCalendar.getInstance().getTime();
-                    String timeString = now.getDay() + " " + now.getHours() + ":" + now.getMinutes();
-                    TrackRecord trackRecord = new TrackRecord(new UserRecord(age, gender), new ArtistRecord(artist.name, artistId, genres), new SongRecord(currentSong.name, trackId, danceability, energy, key, loudness, mode, speechiness, acousticness, instrumentalness, liveness, valence, tempo, duration, timeSignature), timeString, tagId, fractionListenedTo);
-
-                    if (mydb!=null){
-                        mydb.insertTrackHistory(trackRecord);
-                    }
-                    // TODO: Store all of this in a row in a database
+                } catch (IOException | SAXException | ParserConfigurationException e) {
+                    e.printStackTrace();
                 }
-            } catch (IOException | SAXException | ParserConfigurationException e) {
-                e.printStackTrace();
-            }
-        }).start();
+            }).start();
+        }
     }
 
     private  class DownloadImageTask extends AsyncTask<URL, Void, Bitmap> {

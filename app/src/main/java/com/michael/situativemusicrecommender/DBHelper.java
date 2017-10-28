@@ -47,31 +47,31 @@ public class DBHelper extends SQLiteOpenHelper {
             HISTORY_COLUMN_ID + "integer primary key, " + HISTORY_COLUMN_ARTISTNAME + " text, " +
             HISTORY_COLUMN_ARTISTSPOTIFYID + " text, " + HISTORY_COLUMN_TRACKSPOTIFYID + " text, " +
             HISTORY_COLUMN_LOCATIONID + " integer, " + HISTORY_COLUMN_WEIGHT + " real, " +
-            HISTORY_COLUMN_TIMESTAMP + " text " + HISTORY_COLUMN_USERAGE + " integer " +
-            HISTORY_COLUMN_USERGENDER + " text " + HISTORY_COLUMN_ARTIST_GENRES + " text " +
-            HISTORY_COLUMN_TRACKNAME + " text " + HISTORY_COLUMN_TRACKDANCEABILITY + " real " +
-            HISTORY_COLUMN_TRACKENERGY + " real " + HISTORY_COLUMN_TRACKKEY + " real " +
-            HISTORY_COLUMN_TRACKLOUDNESS + " real " + HISTORY_COLUMN_TRACKMODE + " integer " +
-            HISTORY_COLUMN_TRACKSPEECHINESS + " real " + HISTORY_COLUMN_TRACKACOUSTICNESS + " real " +
-            HISTORY_COLUMN_TRACKINSTRUMENTALNESS + " real " + HISTORY_COLUMN_TRACKLIVENESS + " real " +
-            HISTORY_COLUMN_TRACKVALENCE + " real " + HISTORY_COLUMN_TRACKTEMPO + " real" +
-            HISTORY_COLUMN_TRACKDURATION + " integer " + HISTORY_COLUMN_TRACKTIMESIGNATURE + " integer)";
+            HISTORY_COLUMN_TIMESTAMP + " text, " + HISTORY_COLUMN_USERAGE + " integer, " +
+            HISTORY_COLUMN_USERGENDER + " text, " + HISTORY_COLUMN_ARTIST_GENRES + " text, " +
+            HISTORY_COLUMN_TRACKNAME + " text, " + HISTORY_COLUMN_TRACKDANCEABILITY + " real, " +
+            HISTORY_COLUMN_TRACKENERGY + " real, " + HISTORY_COLUMN_TRACKKEY + " real, " +
+            HISTORY_COLUMN_TRACKLOUDNESS + " real, " + HISTORY_COLUMN_TRACKMODE + " integer, " +
+            HISTORY_COLUMN_TRACKSPEECHINESS + " real, " + HISTORY_COLUMN_TRACKACOUSTICNESS + " real, " +
+            HISTORY_COLUMN_TRACKINSTRUMENTALNESS + " real, " + HISTORY_COLUMN_TRACKLIVENESS + " real, " +
+            HISTORY_COLUMN_TRACKVALENCE + " real, " + HISTORY_COLUMN_TRACKTEMPO + " real, " +
+            HISTORY_COLUMN_TRACKDURATION + " integer, " + HISTORY_COLUMN_TRACKTIMESIGNATURE + " integer)";
     private HashMap hp;
 
     DBHelper(Context context) {
-        super(context, DATABASE_NAME , null, 1);
+        super(context, DATABASE_NAME , null, 4);
     }
 
     @Override
     public void onCreate(SQLiteDatabase db) {
         // TODO Auto-generated method stub
-        db.execSQL(CREATE_HISTORY_TABLE
-        );
+        db.execSQL(CREATE_HISTORY_TABLE);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         // TODO Auto-generated method stub
+        System.out.println("New version of database created: " + newVersion + ", former Version: " + oldVersion);
         db.execSQL("DROP TABLE IF EXISTS " + HISTORY_TABLE_NAME);
         onCreate(db);
     }
@@ -79,13 +79,29 @@ public class DBHelper extends SQLiteOpenHelper {
     void insertTrackHistory(MainActivity.TrackRecord trackRecord) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues contentValues = new ContentValues();
-        contentValues.put(HISTORY_COLUMN_ARTISTNAME, artistName);
-        contentValues.put(HISTORY_COLUMN_ARTISTSPOTIFYID, artistSpotifyID);
-        contentValues.put(HISTORY_COLUMN_TRACKSPOTIFYID, trackSpotifyID);
-        contentValues.put(HISTORY_COLUMN_LOCATIONID, situationID);
-        contentValues.put(HISTORY_COLUMN_WEIGHT, weight);
-        long timestamp = dictionary.dateToMilliseconds(dateTimestamp);
-        contentValues.put(HISTORY_COLUMN_TIMESTAMP, timestamp);
+        contentValues.put(HISTORY_COLUMN_ARTISTNAME, trackRecord.artist.name);
+        contentValues.put(HISTORY_COLUMN_ARTISTSPOTIFYID, trackRecord.artist.id);
+        contentValues.put(HISTORY_COLUMN_TRACKSPOTIFYID, trackRecord.song.id);
+        contentValues.put(HISTORY_COLUMN_LOCATIONID, trackRecord.locationId);
+        contentValues.put(HISTORY_COLUMN_WEIGHT, trackRecord.weight);
+        contentValues.put(HISTORY_COLUMN_TIMESTAMP, trackRecord.time);
+        contentValues.put(HISTORY_COLUMN_USERAGE, trackRecord.user.age);
+        contentValues.put(HISTORY_COLUMN_USERGENDER, trackRecord.user.gender);
+        contentValues.put(HISTORY_COLUMN_ARTIST_GENRES, trackRecord.artist.genres.toString());
+        contentValues.put(HISTORY_COLUMN_TRACKNAME, trackRecord.song.name);
+        contentValues.put(HISTORY_COLUMN_TRACKDANCEABILITY, trackRecord.song.danceability);
+        contentValues.put(HISTORY_COLUMN_TRACKENERGY, trackRecord.song.energy);
+        contentValues.put(HISTORY_COLUMN_TRACKKEY, trackRecord.song.key);
+        contentValues.put(HISTORY_COLUMN_TRACKLOUDNESS, trackRecord.song.loudness);
+        contentValues.put(HISTORY_COLUMN_TRACKMODE, trackRecord.song.mode);
+        contentValues.put(HISTORY_COLUMN_TRACKSPEECHINESS, trackRecord.song.speechiness);
+        contentValues.put(HISTORY_COLUMN_TRACKACOUSTICNESS, trackRecord.song.acousticness);
+        contentValues.put(HISTORY_COLUMN_TRACKINSTRUMENTALNESS, trackRecord.song.instrumentalness);
+        contentValues.put(HISTORY_COLUMN_TRACKLIVENESS, trackRecord.song.liveness);
+        contentValues.put(HISTORY_COLUMN_TRACKVALENCE, trackRecord.song.valence);
+        contentValues.put(HISTORY_COLUMN_TRACKTEMPO, trackRecord.song.tempo);
+        contentValues.put(HISTORY_COLUMN_TRACKDURATION, trackRecord.song.duration);
+        contentValues.put(HISTORY_COLUMN_TRACKTIMESIGNATURE, trackRecord.song.timeSignature);
         db.insert(HISTORY_TABLE_NAME, null, contentValues);
     }
 
@@ -128,12 +144,11 @@ public class DBHelper extends SQLiteOpenHelper {
         return array_list;
     }
 
-    ArrayList<RecommendationBuilder.TrackRecord> getTrackRecordsForSituation(int i) {
-        Cursor mCursor = getHistoryData(DBHelper.HISTORY_COLUMN_ARTISTSPOTIFYID + ", " + DBHelper.HISTORY_COLUMN_WEIGHT + ", " + DBHelper.HISTORY_COLUMN_TIMESTAMP, DBHelper.HISTORY_COLUMN_LOCATIONID + " = " + i);
-        ArrayList<RecommendationBuilder.TrackRecord> trackRecords = new ArrayList<>();
+    ArrayList<MainActivity.TrackRecord> getTrackRecordsForSituation(int i) {
+        Cursor mCursor = getHistoryData("*", HISTORY_COLUMN_TRACKDURATION + " > 1");
+        ArrayList<MainActivity.TrackRecord> trackRecords = new ArrayList<>();
         while (mCursor.moveToNext()){
-            Date date = new Date(mCursor.getLong(2));
-            trackRecords.add(new RecommendationBuilder.TrackRecord(mCursor.getString(0), mCursor.getFloat(1), date));
+            System.out.println("Record found: " + mCursor.toString());
         }
         System.out.println(trackRecords.toString());
         return trackRecords;
