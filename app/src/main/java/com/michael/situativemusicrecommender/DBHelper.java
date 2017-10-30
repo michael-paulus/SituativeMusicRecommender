@@ -8,7 +8,7 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Arrays;
 import java.util.HashMap;
 
 /**
@@ -43,8 +43,9 @@ public class DBHelper extends SQLiteOpenHelper {
     private static final String HISTORY_COLUMN_LOCATIONID = "locationid";
     private static final String HISTORY_COLUMN_WEIGHT = "weight";
     private static final String HISTORY_COLUMN_TIMESTAMP = "timestamp";
+    private static final String HISTORY_COLUMN_SENT = "sent";
     private static final String CREATE_HISTORY_TABLE = "create table " + HISTORY_TABLE_NAME + " (" +
-            HISTORY_COLUMN_ID + "integer primary key, " + HISTORY_COLUMN_ARTISTNAME + " text, " +
+            HISTORY_COLUMN_ID + "integer primary Key, " + HISTORY_COLUMN_ARTISTNAME + " text, " +
             HISTORY_COLUMN_ARTISTSPOTIFYID + " text, " + HISTORY_COLUMN_TRACKSPOTIFYID + " text, " +
             HISTORY_COLUMN_LOCATIONID + " integer, " + HISTORY_COLUMN_WEIGHT + " real, " +
             HISTORY_COLUMN_TIMESTAMP + " text, " + HISTORY_COLUMN_USERAGE + " integer, " +
@@ -55,11 +56,12 @@ public class DBHelper extends SQLiteOpenHelper {
             HISTORY_COLUMN_TRACKSPEECHINESS + " real, " + HISTORY_COLUMN_TRACKACOUSTICNESS + " real, " +
             HISTORY_COLUMN_TRACKINSTRUMENTALNESS + " real, " + HISTORY_COLUMN_TRACKLIVENESS + " real, " +
             HISTORY_COLUMN_TRACKVALENCE + " real, " + HISTORY_COLUMN_TRACKTEMPO + " real, " +
-            HISTORY_COLUMN_TRACKDURATION + " integer, " + HISTORY_COLUMN_TRACKTIMESIGNATURE + " integer)";
+            HISTORY_COLUMN_TRACKDURATION + " integer, " + HISTORY_COLUMN_TRACKTIMESIGNATURE + " integer," +
+            HISTORY_COLUMN_SENT + " integer)";
     private HashMap hp;
 
     DBHelper(Context context) {
-        super(context, DATABASE_NAME , null, 4);
+        super(context, DATABASE_NAME, null, 5);
     }
 
     @Override
@@ -79,53 +81,54 @@ public class DBHelper extends SQLiteOpenHelper {
     void insertTrackHistory(MainActivity.TrackRecord trackRecord) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues contentValues = new ContentValues();
-        contentValues.put(HISTORY_COLUMN_ARTISTNAME, trackRecord.artist.name);
-        contentValues.put(HISTORY_COLUMN_ARTISTSPOTIFYID, trackRecord.artist.id);
-        contentValues.put(HISTORY_COLUMN_TRACKSPOTIFYID, trackRecord.song.id);
-        contentValues.put(HISTORY_COLUMN_LOCATIONID, trackRecord.locationId);
-        contentValues.put(HISTORY_COLUMN_WEIGHT, trackRecord.weight);
-        contentValues.put(HISTORY_COLUMN_TIMESTAMP, trackRecord.time);
-        contentValues.put(HISTORY_COLUMN_USERAGE, trackRecord.user.age);
-        contentValues.put(HISTORY_COLUMN_USERGENDER, trackRecord.user.gender);
-        contentValues.put(HISTORY_COLUMN_ARTIST_GENRES, trackRecord.artist.genres.toString());
-        contentValues.put(HISTORY_COLUMN_TRACKNAME, trackRecord.song.name);
-        contentValues.put(HISTORY_COLUMN_TRACKDANCEABILITY, trackRecord.song.danceability);
-        contentValues.put(HISTORY_COLUMN_TRACKENERGY, trackRecord.song.energy);
-        contentValues.put(HISTORY_COLUMN_TRACKKEY, trackRecord.song.key);
-        contentValues.put(HISTORY_COLUMN_TRACKLOUDNESS, trackRecord.song.loudness);
-        contentValues.put(HISTORY_COLUMN_TRACKMODE, trackRecord.song.mode);
-        contentValues.put(HISTORY_COLUMN_TRACKSPEECHINESS, trackRecord.song.speechiness);
-        contentValues.put(HISTORY_COLUMN_TRACKACOUSTICNESS, trackRecord.song.acousticness);
-        contentValues.put(HISTORY_COLUMN_TRACKINSTRUMENTALNESS, trackRecord.song.instrumentalness);
-        contentValues.put(HISTORY_COLUMN_TRACKLIVENESS, trackRecord.song.liveness);
-        contentValues.put(HISTORY_COLUMN_TRACKVALENCE, trackRecord.song.valence);
-        contentValues.put(HISTORY_COLUMN_TRACKTEMPO, trackRecord.song.tempo);
-        contentValues.put(HISTORY_COLUMN_TRACKDURATION, trackRecord.song.duration);
-        contentValues.put(HISTORY_COLUMN_TRACKTIMESIGNATURE, trackRecord.song.timeSignature);
+        contentValues.put(HISTORY_COLUMN_ARTISTNAME, trackRecord.Artist.Name);
+        contentValues.put(HISTORY_COLUMN_ARTISTSPOTIFYID, trackRecord.Artist.Id);
+        contentValues.put(HISTORY_COLUMN_TRACKSPOTIFYID, trackRecord.Track.Id);
+        contentValues.put(HISTORY_COLUMN_LOCATIONID, trackRecord.LocationId);
+        contentValues.put(HISTORY_COLUMN_WEIGHT, trackRecord.Weight);
+        contentValues.put(HISTORY_COLUMN_TIMESTAMP, trackRecord.Time);
+        contentValues.put(HISTORY_COLUMN_USERAGE, trackRecord.User.Age);
+        contentValues.put(HISTORY_COLUMN_USERGENDER, trackRecord.User.Gender);
+        contentValues.put(HISTORY_COLUMN_ARTIST_GENRES, trackRecord.Artist.Genres.toString());
+        contentValues.put(HISTORY_COLUMN_TRACKNAME, trackRecord.Track.Name);
+        contentValues.put(HISTORY_COLUMN_TRACKDANCEABILITY, trackRecord.Track.Danceability);
+        contentValues.put(HISTORY_COLUMN_TRACKENERGY, trackRecord.Track.Energy);
+        contentValues.put(HISTORY_COLUMN_TRACKKEY, trackRecord.Track.Key);
+        contentValues.put(HISTORY_COLUMN_TRACKLOUDNESS, trackRecord.Track.Loudness);
+        contentValues.put(HISTORY_COLUMN_TRACKMODE, trackRecord.Track.Mode);
+        contentValues.put(HISTORY_COLUMN_TRACKSPEECHINESS, trackRecord.Track.Speechiness);
+        contentValues.put(HISTORY_COLUMN_TRACKACOUSTICNESS, trackRecord.Track.Acousticness);
+        contentValues.put(HISTORY_COLUMN_TRACKINSTRUMENTALNESS, trackRecord.Track.Instrumentalness);
+        contentValues.put(HISTORY_COLUMN_TRACKLIVENESS, trackRecord.Track.Liveness);
+        contentValues.put(HISTORY_COLUMN_TRACKVALENCE, trackRecord.Track.Valence);
+        contentValues.put(HISTORY_COLUMN_TRACKTEMPO, trackRecord.Track.Tempo);
+        contentValues.put(HISTORY_COLUMN_TRACKDURATION, trackRecord.Track.Duration);
+        contentValues.put(HISTORY_COLUMN_TRACKTIMESIGNATURE, trackRecord.Track.Time_Signature);
+        contentValues.put(HISTORY_COLUMN_SENT, 0);
         db.insert(HISTORY_TABLE_NAME, null, contentValues);
     }
 
     private Cursor getHistoryData(String field, String where) {
         SQLiteDatabase db = this.getReadableDatabase();
-        Cursor res =  db.rawQuery( "select " + field + " from " + HISTORY_TABLE_NAME + " where " + where + "", null );
+        Cursor res = db.rawQuery("select " + field + " from " + HISTORY_TABLE_NAME + " where " + where + "", null);
         return res;
     }
 
-    public int numberOfRows(){
+    public int numberOfRows() {
         SQLiteDatabase db = this.getReadableDatabase();
         int numRows = (int) DatabaseUtils.queryNumEntries(db, HISTORY_TABLE_NAME);
         return numRows;
     }
 
-    public boolean updateContact (Integer id, String name, String phone, String email, String street,String place) {
+    public boolean updateContact(Integer id, String name, String phone, String email, String street, String place) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues contentValues = new ContentValues();
-        contentValues.put("name", name);
+        contentValues.put("Name", name);
         contentValues.put("phone", phone);
         contentValues.put("email", email);
         contentValues.put("street", street);
         contentValues.put("place", place);
-        db.update("contacts", contentValues, "id = ? ", new String[] { Integer.toString(id) } );
+        db.update("contacts", contentValues, "Id = ? ", new String[]{Integer.toString(id)});
         return true;
     }
 
@@ -134,21 +137,45 @@ public class DBHelper extends SQLiteOpenHelper {
 
         //hp = new HashMap();
         SQLiteDatabase db = this.getReadableDatabase();
-        Cursor res =  db.rawQuery( "select * from " + HISTORY_TABLE_NAME, null );
+        Cursor res = db.rawQuery("select * from " + HISTORY_TABLE_NAME, null);
         res.moveToFirst();
 
-        while(!res.isAfterLast()){
+        while (!res.isAfterLast()) {
             array_list.add(res.getString(res.getColumnIndex(HISTORY_COLUMN_TRACKSPOTIFYID)));
             res.moveToNext();
         }
         return array_list;
     }
 
-    ArrayList<MainActivity.TrackRecord> getTrackRecordsForSituation(int i) {
-        Cursor mCursor = getHistoryData("*", HISTORY_COLUMN_TRACKDURATION + " > 1");
+    ArrayList<MainActivity.TrackRecord> getUnsentTrackRecords() {
+        Cursor mCursor = getHistoryData("*", HISTORY_COLUMN_SENT + " = 0");
         ArrayList<MainActivity.TrackRecord> trackRecords = new ArrayList<>();
-        while (mCursor.moveToNext()){
+        while (mCursor.moveToNext()) {
             System.out.println("Record found: " + mCursor.toString());
+            trackRecords.add(new MainActivity.TrackRecord(
+                    new MainActivity.UserRecord(mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_USERAGE)),
+                            mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_USERGENDER))),
+                    new MainActivity.ArtistRecord(mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_ARTISTNAME)),
+                            mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_ARTISTSPOTIFYID)),
+                            Arrays.asList(mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_ARTIST_GENRES)).substring(1, mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_ARTIST_GENRES)).length() - 1).split(", "))),
+                    new MainActivity.SongRecord(mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKNAME)),
+                            mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKSPOTIFYID)),
+                            mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKDANCEABILITY)),
+                            mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKENERGY)),
+                            mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKKEY)),
+                            mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKLOUDNESS)),
+                            mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKMODE)),
+                            mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKSPEECHINESS)),
+                            mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKACOUSTICNESS)),
+                            mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKINSTRUMENTALNESS)),
+                            mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKLIVENESS)),
+                            mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKVALENCE)),
+                            mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKTEMPO)),
+                            mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKDURATION)),
+                            mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKTIMESIGNATURE))),
+                    mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_TIMESTAMP)),
+                    mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_LOCATIONID)),
+                    mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_WEIGHT))));
         }
         System.out.println(trackRecords.toString());
         return trackRecords;

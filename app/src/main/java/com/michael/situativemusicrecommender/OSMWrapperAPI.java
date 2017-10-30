@@ -139,7 +139,7 @@ public class OSMWrapperAPI {
                                 .getNodeValue());
                     }
                 }
-                Node namedItemID = attributes.getNamedItem("id");
+                Node namedItemID = attributes.getNamedItem("Id");
                 Node namedItemLat = attributes.getNamedItem("lat");
                 Node namedItemLon = attributes.getNamedItem("lon");
                 Node namedItemVersion = attributes.getNamedItem("version");
@@ -341,7 +341,7 @@ public class OSMWrapperAPI {
 
     private static String readTagKey(XmlPullParser parser) {
         String key =  parser.getAttributeValue(null, "k");
-        Log.d("Found key", key);
+        Log.d("Found Key", key);
         return key;
     }
 

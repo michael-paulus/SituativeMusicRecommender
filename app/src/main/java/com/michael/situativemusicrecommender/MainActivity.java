@@ -20,7 +20,6 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Looper;
 import android.preference.PreferenceManager;
-import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -28,18 +27,16 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.gson.Gson;
 import com.spotify.sdk.android.authentication.AuthenticationClient;
 import com.spotify.sdk.android.authentication.AuthenticationRequest;
 import com.spotify.sdk.android.authentication.AuthenticationResponse;
@@ -52,8 +49,11 @@ import com.spotify.sdk.android.player.PlayerEvent;
 import com.spotify.sdk.android.player.Spotify;
 import com.spotify.sdk.android.player.SpotifyPlayer;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.xml.sax.SAXException;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -69,6 +69,14 @@ import java.util.Map;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import cz.msebera.android.httpclient.HttpEntity;
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.NameValuePair;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.client.entity.UrlEncodedFormEntity;
+import cz.msebera.android.httpclient.client.methods.HttpPost;
+import cz.msebera.android.httpclient.impl.client.HttpClients;
+import cz.msebera.android.httpclient.message.BasicNameValuePair;
 import kaaes.spotify.webapi.android.SpotifyApi;
 import kaaes.spotify.webapi.android.SpotifyService;
 import kaaes.spotify.webapi.android.models.AlbumSimple;
@@ -108,11 +116,15 @@ public class MainActivity extends AppCompatActivity implements
         itself = this;
         constructDB();
 
-        checkIfIdTokenStillValid();
-
         prepLayout();
 
         setLocationListener();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        checkIfIdTokenStillValid();
     }
 
     private void checkIfIdTokenStillValid() {
@@ -125,7 +137,7 @@ public class MainActivity extends AppCompatActivity implements
                 AuthenticationRequest.Builder builder = new AuthenticationRequest.Builder(CLIENT_ID,
                         AuthenticationResponse.Type.TOKEN,
                         REDIRECT_URI);
-                builder.setScopes(new String[]{"user-read-private", "streaming"});
+                builder.setScopes(new String[]{"streaming"});
                 AuthenticationRequest request = builder.build();
 
                 //AuthenticationClient.openLoginActivity(this, REQUEST_CODE, request);
@@ -159,10 +171,10 @@ public class MainActivity extends AppCompatActivity implements
         final EditText edittext = (EditText) findViewById(R.id.search_text);
         edittext.setSingleLine(true);
         edittext.setOnKeyListener((v, keyCode, event) -> {
-            // If the event is a key-down event on the "enter" button
+            // If the event is a Key-down event on the "enter" button
             if ((event.getAction() == KeyEvent.ACTION_DOWN) &&
                     (keyCode == KeyEvent.KEYCODE_ENTER)) {
-                // Perform action on key press
+                // Perform action on Key press
                 Toast.makeText(MainActivity.this, edittext.getText(), Toast.LENGTH_SHORT).show();
                 edittext.clearFocus();
                 edittext.setCursorVisible(false);
@@ -199,7 +211,7 @@ public class MainActivity extends AppCompatActivity implements
                     LinearLayout parent = (LinearLayout) findViewById(R.id.artists_layout);
                     parent.removeAllViews();
                     for (Artist a : artistsPager.artists.items) {
-                        Log.d("Found artist", a.name);
+                        Log.d("Found Artist", a.name);
                         LinearLayout artistLayout = new LinearLayout(MainActivity.this);
                         artistLayout.setPadding(10, 0, 10, 0);
                         artistLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -351,12 +363,12 @@ public class MainActivity extends AppCompatActivity implements
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.Button:
-                // This button logs in the user into Spotify.
+                // This button logs in the User into Spotify.
                 if (isNetworkAvailable()) {
                     AuthenticationRequest.Builder builder = new AuthenticationRequest.Builder(CLIENT_ID,
                             AuthenticationResponse.Type.TOKEN,
                             REDIRECT_URI);
-                    builder.setScopes(new String[]{"user-read-private", "streaming"});
+                    builder.setScopes(new String[]{"User-read-private", "streaming"});
                     AuthenticationRequest request = builder.build();
 
                     //AuthenticationClient.openLoginActivity(this, REQUEST_CODE, request);
@@ -365,7 +377,7 @@ public class MainActivity extends AppCompatActivity implements
                 break;
             case R.id.Button3:
                 if (isNetworkAvailable()) {
-                    getLocationType();
+                    sendRecords();
                 }
                 break;
             case R.id.play_button:
@@ -739,11 +751,11 @@ public class MainActivity extends AppCompatActivity implements
 
                     @Override
                     public void onError(Error error) {
-                        playMusic("spotify:user:1154572061:playlist:6MPgJeqV7uSo8oIZCdRnGp", TYPE_PLAYLIST);
+                        playMusic("spotify:User:1154572061:playlist:6MPgJeqV7uSo8oIZCdRnGp", TYPE_PLAYLIST);
                     }
                 });
             } else {
-                playMusic("spotify:user:1154572061:playlist:6MPgJeqV7uSo8oIZCdRnGp", TYPE_PLAYLIST);
+                playMusic("spotify:User:1154572061:playlist:6MPgJeqV7uSo8oIZCdRnGp", TYPE_PLAYLIST);
             }
         }
     }
@@ -782,7 +794,7 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    private class Song{
+    private class Song {
 
         String artistName;
         String artistUri;
@@ -791,6 +803,7 @@ public class MainActivity extends AppCompatActivity implements
         String uri;
         ArrayList<Long> startTimes;
         ArrayList<Long> endTimes;
+        boolean isPlaying = false;
 
         Song(Metadata.Track currentTrack) {
             artistName = currentTrack.artistName;
@@ -803,19 +816,25 @@ public class MainActivity extends AppCompatActivity implements
         }
 
         void play() {
-            startTimes.add(GregorianCalendar.getInstance().getTimeInMillis() / 1000);
+            if (!isPlaying) {
+                startTimes.add(GregorianCalendar.getInstance().getTimeInMillis() / 1000);
+                isPlaying = true;
+            }
         }
 
         void pause() {
-            endTimes.add(GregorianCalendar.getInstance().getTimeInMillis() / 1000);
+            if (isPlaying){
+                endTimes.add(GregorianCalendar.getInstance().getTimeInMillis() / 1000);
+                isPlaying = false;
+            }
         }
 
         long getPlaytime() {
             long time = 0;
-            for (Long l: endTimes){
+            for (Long l : endTimes) {
                 time += l;
             }
-            for (Long l: startTimes){
+            for (Long l : startTimes) {
                 time -= l;
             }
             return time;
@@ -830,10 +849,12 @@ public class MainActivity extends AppCompatActivity implements
 
     private void finishCurrentSong() {
         try {
+            currentSong.pause();
             float fractionListenedTo = (float) (currentSong.getPlaytime()) / (currentSong.durationMs / 1000);
-            System.out.println("Finished song " + currentSong.name + " by " + currentSong.artistName + " after " + fractionListenedTo + " of the duration");
+            System.out.println("Finished Track " + currentSong.name + " by " + currentSong.artistName + " after " + fractionListenedTo + " of the Duration");
             stackSong(currentSong, fractionListenedTo);
-        } catch (Exception ignored){}
+        } catch (Exception ignored) {
+        }
     }
 
     private void stackSong(Song currentSong, float fractionListenedTo) {
@@ -894,7 +915,7 @@ public class MainActivity extends AppCompatActivity implements
                         if (mydb != null) {
                             mydb.insertTrackHistory(trackRecord);
                         }
-                        mydb.getTrackRecordsForSituation(1);
+                        mydb.getUnsentTrackRecords();
                         // TODO: Store all of this in a row in a database
                     }
                 } catch (IOException | SAXException | ParserConfigurationException e) {
@@ -904,7 +925,7 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    private  class DownloadImageTask extends AsyncTask<URL, Void, Bitmap> {
+    private class DownloadImageTask extends AsyncTask<URL, Void, Bitmap> {
         ImageView bmImage;
 
         DownloadImageTask() {
@@ -939,79 +960,130 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    class TrackRecord{
-        UserRecord user;
-        ArtistRecord artist;
-        SongRecord song;
-        String time;
-        int locationId;
-        float weight;
+    static class TrackRecord {
+        UserRecord User;
+        ArtistRecord Artist;
+        SongRecord Track;
+        String Time;
+        int LocationId;
+        float Weight;
 
-        TrackRecord(UserRecord user, ArtistRecord artist, SongRecord song, String time, int locationId, float weight){
-            this.user = user;
-            this.artist = artist;
-            this.song = song;
-            this.time = time;
-            this.locationId = locationId;
-            this.weight = weight;
+        TrackRecord(UserRecord user, ArtistRecord artist, SongRecord Track, String time, int locationId, float weight) {
+            this.User = user;
+            this.Artist = artist;
+            this.Track = Track;
+            this.Time = time;
+            this.LocationId = locationId;
+            this.Weight = weight;
         }
     }
 
-    class UserRecord{
-        int age;
-        String gender;
+    static class UserRecord {
+        int Age;
+        String Gender;
 
-        UserRecord(int age, String gender){
-            this.age = age;
-            this.gender = gender;
+        UserRecord(int age, String gender) {
+            this.Age = age;
+            this.Gender = gender;
         }
     }
 
-    class ArtistRecord{
-        String name;
-        String id;
-        ArrayList<String> genres;
+    static class ArtistRecord {
+        String Name;
+        String Id;
+        List<String> Genres;
 
-        ArtistRecord(String name, String id, ArrayList<String> genres){
-            this.name = name;
-            this.id = id;
-            this.genres = genres;
+        ArtistRecord(String name, String id, List<String> genres) {
+            this.Name = name;
+            this.Id = id;
+            this.Genres = genres;
         }
     }
 
-    class SongRecord{
-        String name;
-        String id;
-        float danceability;
-        float energy;
-        int key;
-        float loudness;
-        int mode;
-        float speechiness;
-        float acousticness;
-        float instrumentalness;
-        float liveness;
-        float valence;
-        float tempo;
-        int duration;
-        int timeSignature;
+    static class SongRecord {
+        String Name;
+        String Id;
+        float Danceability;
+        float Energy;
+        int Key;
+        float Loudness;
+        int Mode;
+        float Speechiness;
+        float Acousticness;
+        float Instrumentalness;
+        float Liveness;
+        float Valence;
+        float Tempo;
+        int Duration;
+        int Time_Signature;
 
-        SongRecord(String name, String id, float danceability, float energy, int key, float loudness, int mode, float speechiness, float acousticness, float instrumentalness, float liveness, float valence, float tempo, int duration, int timeSignature){
-            this.acousticness = acousticness;
-            this.danceability = danceability;
-            this.duration = duration;
-            this.energy = energy;
-            this.id = id;
-            this.instrumentalness = instrumentalness;
-            this.key = key;
-            this.liveness = liveness;
-            this.loudness = loudness;
-            this.mode = mode;
-            this.name = name;
-            this.speechiness = speechiness;
-            this.tempo = tempo;
-            this.timeSignature = timeSignature;
-            this.valence = valence;
+        SongRecord(String name, String id, float danceability, float energy, int key, float loudness, int mode, float speechiness, float acousticness, float instrumentalness, float liveness, float valence, float Tempo, int duration, int Time_Signature) {
+            this.Acousticness = acousticness;
+            this.Danceability = danceability;
+            this.Duration = duration;
+            this.Energy = energy;
+            this.Id = id;
+            this.Instrumentalness = instrumentalness;
+            this.Key = key;
+            this.Liveness = liveness;
+            this.Loudness = loudness;
+            this.Mode = mode;
+            this.Name = name;
+            this.Speechiness = speechiness;
+            this.Tempo = Tempo;
+            this.Time_Signature = Time_Signature;
+            this.Valence = valence;
         }
+    }
+
+    void sendRecords() {
+        new Thread(() -> {
+            try {
+                System.out.println("Building the http request");
+                URL url = new URL(getString(R.string.home_server_url_send_records));
+                JSONArray listOfRecords = buildRecordsJson();
+                JSONObject sendToServerObject = new JSONObject();
+                sendToServerObject.put("Track_History", listOfRecords);
+
+                System.out.println("Sending: " + sendToServerObject.toString());
+
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json;charset=UTF-8");
+                conn.setRequestProperty("Accept","application/json");
+                conn.setDoOutput(true);
+                conn.setDoInput(true);
+
+                DataOutputStream os = new DataOutputStream(conn.getOutputStream());
+                os.writeBytes(sendToServerObject.toString());
+
+                os.flush();
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                String responseMessage = conn.getResponseMessage();
+
+                System.out.println(responseCode +": " + responseMessage);
+
+                conn.disconnect();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    private JSONArray buildRecordsJson() {
+        System.out.println("Building the json object");
+        JSONArray listOfRecordsJsonArray = new JSONArray();
+        List<TrackRecord> listOfRecordsArrayList = mydb.getUnsentTrackRecords();
+        try {
+            for (TrackRecord t : listOfRecordsArrayList) {
+                System.out.println("Found TrackRecord:");
+                Gson gson = new Gson();
+                JSONObject recordJson = new JSONObject(gson.toJson(t));
+                listOfRecordsJsonArray.put(recordJson);
+            }
+        } catch (Exception ignored){}
+        return listOfRecordsJsonArray;
     }
 }
