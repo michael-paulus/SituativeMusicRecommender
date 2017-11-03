@@ -368,7 +368,7 @@ public class MainActivity extends AppCompatActivity implements
                     AuthenticationRequest.Builder builder = new AuthenticationRequest.Builder(CLIENT_ID,
                             AuthenticationResponse.Type.TOKEN,
                             REDIRECT_URI);
-                    builder.setScopes(new String[]{"User-read-private", "streaming"});
+                    builder.setScopes(new String[]{"streaming"});
                     AuthenticationRequest request = builder.build();
 
                     //AuthenticationClient.openLoginActivity(this, REQUEST_CODE, request);
@@ -715,6 +715,7 @@ public class MainActivity extends AppCompatActivity implements
         if (mPlayer.getMetadata().contextUri == null || !mPlayer.getMetadata().contextUri.equals(s)) {
             Intent i = new Intent("com.android.music.musicservicecommand");
             i.putExtra("command", "pause");
+            System.out.println("Now playing: " + s);
             sendBroadcast(i);
             switch (type) {
                 case TYPE_PLAYLIST:
@@ -813,9 +814,11 @@ public class MainActivity extends AppCompatActivity implements
             uri = currentTrack.uri;
             startTimes = new ArrayList<>();
             endTimes = new ArrayList<>();
+            play();
         }
 
         void play() {
+            System.out.println("Play called");
             if (!isPlaying) {
                 startTimes.add(GregorianCalendar.getInstance().getTimeInMillis() / 1000);
                 isPlaying = true;
@@ -823,6 +826,7 @@ public class MainActivity extends AppCompatActivity implements
         }
 
         void pause() {
+            System.out.println("Pause called");
             if (isPlaying){
                 endTimes.add(GregorianCalendar.getInstance().getTimeInMillis() / 1000);
                 isPlaying = false;
@@ -830,6 +834,8 @@ public class MainActivity extends AppCompatActivity implements
         }
 
         long getPlaytime() {
+            System.out.println("StartTimes:" + startTimes.toString());
+            System.out.println("EndTimes:" + endTimes.toString());
             long time = 0;
             for (Long l : endTimes) {
                 time += l;
@@ -844,15 +850,18 @@ public class MainActivity extends AppCompatActivity implements
     Song currentSong;
 
     private void startSong(Metadata metadata) {
+        System.out.println("start called");
         currentSong = new Song(metadata.currentTrack);
     }
 
     private void finishCurrentSong() {
+        System.out.println("finish called");
         try {
             currentSong.pause();
-            float fractionListenedTo = (float) (currentSong.getPlaytime()) / (currentSong.durationMs / 1000);
+            float fractionListenedTo = ((float) currentSong.getPlaytime()) / ((float) currentSong.durationMs / 1000);
             System.out.println("Finished Track " + currentSong.name + " by " + currentSong.artistName + " after " + fractionListenedTo + " of the Duration");
             stackSong(currentSong, fractionListenedTo);
+            currentSong = null;
         } catch (Exception ignored) {
         }
     }
@@ -909,7 +918,19 @@ public class MainActivity extends AppCompatActivity implements
                         int duration = audioFeatures.duration_ms;
 
                         Date now = GregorianCalendar.getInstance().getTime();
-                        String timeString = now.getDay() + " " + now.getHours() + ":" + now.getMinutes();
+                        String minutes;
+                        if (now.getMinutes() < 10){
+                            minutes = "0" + now.getMinutes();
+                        } else {
+                            minutes = String.valueOf(now.getMinutes());
+                        }
+                        String hours;
+                        if (now.getHours() < 10){
+                            hours = "0" + now.getHours();
+                        } else {
+                            hours = String.valueOf(now.getHours());
+                        }
+                        String timeString = now.getDay() + " " + hours + ":" + minutes;
                         TrackRecord trackRecord = new TrackRecord(new UserRecord(age, gender), new ArtistRecord(artist.name, artistId, genres), new SongRecord(currentSong.name, trackId, danceability, energy, key, loudness, mode, speechiness, acousticness, instrumentalness, liveness, valence, tempo, duration, timeSignature), timeString, tagId, fractionListenedTo);
 
                         if (mydb != null) {
@@ -1041,7 +1062,8 @@ public class MainActivity extends AppCompatActivity implements
             try {
                 System.out.println("Building the http request");
                 URL url = new URL(getString(R.string.home_server_url_send_records));
-                JSONArray listOfRecords = buildRecordsJson();
+                SendTracksObject sendTracksObject = buildRecordsJson();
+                JSONArray listOfRecords = sendTracksObject.listOfRecordsJsonArray;
                 JSONObject sendToServerObject = new JSONObject();
                 sendToServerObject.put("Track_History", listOfRecords);
 
@@ -1065,6 +1087,10 @@ public class MainActivity extends AppCompatActivity implements
 
                 System.out.println(responseCode +": " + responseMessage);
 
+                if(responseCode == 201){
+                    mydb.updateTrackRecords(sendTracksObject.listOfIdsOfUnsentRecords);
+                }
+
                 conn.disconnect();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -1072,10 +1098,21 @@ public class MainActivity extends AppCompatActivity implements
         }).start();
     }
 
-    private JSONArray buildRecordsJson() {
+    class SendTracksObject{
+        JSONArray listOfRecordsJsonArray;
+        List<Integer> listOfIdsOfUnsentRecords;
+
+        SendTracksObject(JSONArray listOfRecordsJsonArray, List<Integer> listOfIdsOfUnsentRecords) {
+            this.listOfRecordsJsonArray = listOfRecordsJsonArray;
+            this.listOfIdsOfUnsentRecords = listOfIdsOfUnsentRecords;
+        }
+    }
+
+    private SendTracksObject buildRecordsJson() {
         System.out.println("Building the json object");
         JSONArray listOfRecordsJsonArray = new JSONArray();
         List<TrackRecord> listOfRecordsArrayList = mydb.getUnsentTrackRecords();
+        List<Integer> listOfIdsOfUnsentRecords = mydb.getUnsentTrackRecordsIds();
         try {
             for (TrackRecord t : listOfRecordsArrayList) {
                 System.out.println("Found TrackRecord:");
@@ -1084,6 +1121,7 @@ public class MainActivity extends AppCompatActivity implements
                 listOfRecordsJsonArray.put(recordJson);
             }
         } catch (Exception ignored){}
-        return listOfRecordsJsonArray;
+        SendTracksObject sendTracksObject = new SendTracksObject(listOfRecordsJsonArray, listOfIdsOfUnsentRecords);
+        return sendTracksObject;
     }
 }

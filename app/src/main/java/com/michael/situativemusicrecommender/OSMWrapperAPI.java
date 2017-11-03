@@ -139,7 +139,7 @@ public class OSMWrapperAPI {
                                 .getNodeValue());
                     }
                 }
-                Node namedItemID = attributes.getNamedItem("Id");
+                Node namedItemID = attributes.getNamedItem("id");
                 Node namedItemLat = attributes.getNamedItem("lat");
                 Node namedItemLon = attributes.getNamedItem("lon");
                 Node namedItemVersion = attributes.getNamedItem("version");

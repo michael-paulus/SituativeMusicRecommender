@@ -10,6 +10,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * Created by Michael on 08.09.2017.
@@ -45,7 +46,7 @@ public class DBHelper extends SQLiteOpenHelper {
     private static final String HISTORY_COLUMN_TIMESTAMP = "timestamp";
     private static final String HISTORY_COLUMN_SENT = "sent";
     private static final String CREATE_HISTORY_TABLE = "create table " + HISTORY_TABLE_NAME + " (" +
-            HISTORY_COLUMN_ID + "integer primary Key, " + HISTORY_COLUMN_ARTISTNAME + " text, " +
+            HISTORY_COLUMN_ID + " integer primary Key, " + HISTORY_COLUMN_ARTISTNAME + " text, " +
             HISTORY_COLUMN_ARTISTSPOTIFYID + " text, " + HISTORY_COLUMN_TRACKSPOTIFYID + " text, " +
             HISTORY_COLUMN_LOCATIONID + " integer, " + HISTORY_COLUMN_WEIGHT + " real, " +
             HISTORY_COLUMN_TIMESTAMP + " text, " + HISTORY_COLUMN_USERAGE + " integer, " +
@@ -59,9 +60,10 @@ public class DBHelper extends SQLiteOpenHelper {
             HISTORY_COLUMN_TRACKDURATION + " integer, " + HISTORY_COLUMN_TRACKTIMESIGNATURE + " integer," +
             HISTORY_COLUMN_SENT + " integer)";
     private HashMap hp;
+    private List<Integer> unsentTrackRecordsIds;
 
     DBHelper(Context context) {
-        super(context, DATABASE_NAME, null, 5);
+        super(context, DATABASE_NAME, null, 7);
     }
 
     @Override
@@ -179,5 +181,17 @@ public class DBHelper extends SQLiteOpenHelper {
         }
         System.out.println(trackRecords.toString());
         return trackRecords;
+    }
+
+    public List<Integer> getUnsentTrackRecordsIds() {
+        List<Integer> listOfIdsOfUnsentRecords = new ArrayList<>();
+        Cursor mCursor = getHistoryData("*", HISTORY_COLUMN_SENT + " = 0");
+        while (mCursor.moveToNext()) {
+            listOfIdsOfUnsentRecords.add(mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_ID)));
+        }
+        return listOfIdsOfUnsentRecords;
+    }
+
+    void updateTrackRecords(List<Integer> listOfIdsOfUnsentRecords) {
     }
 }
