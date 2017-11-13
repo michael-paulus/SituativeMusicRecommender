@@ -155,7 +155,8 @@ public class DBHelper extends SQLiteOpenHelper {
         while (mCursor.moveToNext()) {
             System.out.println("Record found: " + mCursor.toString());
             trackRecords.add(new MainActivity.TrackRecord(
-                    new MainActivity.UserRecord(mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_USERAGE)),
+                    new MainActivity.UserRecord(MainActivity.itself.getUserId(),
+                            mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_USERAGE)),
                             mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_USERGENDER))),
                     new MainActivity.ArtistRecord(mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_ARTISTNAME)),
                             mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_ARTISTSPOTIFYID)),
@@ -193,5 +194,11 @@ public class DBHelper extends SQLiteOpenHelper {
     }
 
     void updateTrackRecords(List<Integer> listOfIdsOfUnsentRecords) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(HISTORY_COLUMN_SENT, 1);
+        for (int i: listOfIdsOfUnsentRecords) {
+            db.update(HISTORY_TABLE_NAME, contentValues, HISTORY_COLUMN_ID + " = ? ", new String[]{Integer.toString(i)});
+        }
     }
 }

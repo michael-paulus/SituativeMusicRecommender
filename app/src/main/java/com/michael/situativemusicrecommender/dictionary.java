@@ -166,6 +166,13 @@ public class dictionary {
                         break;
                 }
                 break;
+            case "highway":
+                switch ((String) entry.getValue()){
+                    case "residential":
+                        type = 22;
+                        break;
+                }
+                break;
             case "historic":
                 type = 21;
                 break;

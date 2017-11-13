@@ -33,6 +33,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -63,28 +64,22 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import javax.xml.parsers.ParserConfigurationException;
 
-import cz.msebera.android.httpclient.HttpEntity;
-import cz.msebera.android.httpclient.HttpResponse;
-import cz.msebera.android.httpclient.NameValuePair;
-import cz.msebera.android.httpclient.client.HttpClient;
-import cz.msebera.android.httpclient.client.entity.UrlEncodedFormEntity;
-import cz.msebera.android.httpclient.client.methods.HttpPost;
-import cz.msebera.android.httpclient.impl.client.HttpClients;
-import cz.msebera.android.httpclient.message.BasicNameValuePair;
 import kaaes.spotify.webapi.android.SpotifyApi;
 import kaaes.spotify.webapi.android.SpotifyService;
+import kaaes.spotify.webapi.android.models.Album;
 import kaaes.spotify.webapi.android.models.AlbumSimple;
 import kaaes.spotify.webapi.android.models.AlbumsPager;
 import kaaes.spotify.webapi.android.models.Artist;
 import kaaes.spotify.webapi.android.models.ArtistsPager;
 import kaaes.spotify.webapi.android.models.AudioFeaturesTrack;
+import kaaes.spotify.webapi.android.models.Pager;
 import kaaes.spotify.webapi.android.models.Track;
+import kaaes.spotify.webapi.android.models.TrackSimple;
 import kaaes.spotify.webapi.android.models.TracksPager;
 import retrofit.Callback;
 import retrofit.RetrofitError;
@@ -107,6 +102,8 @@ public class MainActivity extends AppCompatActivity implements
 
     public static final String REDIRECT_URI = "michael-situativemusicrecommender://callback";
     private DBHelper mydb;
+    private String userId;
+    private List<TrackSimple> queue;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,6 +129,9 @@ public class MainActivity extends AppCompatActivity implements
         int initialStorageTime = pref.getInt("AccessToken_StorageTime", 0);
         int currentTime = (int) Calendar.getInstance().getTimeInMillis() / 1000;
         int expirationTime = pref.getInt("AccessToken_ExpirationSeconds", 0);
+        if (userId == null || userId.equals("")) {
+            userId = pref.getString("UserId", "");
+        }
         if (initialStorageTime + expirationTime < currentTime - 1000) {
             if (isNetworkAvailable()) {
                 AuthenticationRequest.Builder builder = new AuthenticationRequest.Builder(CLIENT_ID,
@@ -231,6 +231,10 @@ public class MainActivity extends AppCompatActivity implements
                         artistName.setLines(2);
                         artistLayout.addView(artistName);
 
+                        artistLayout.setOnClickListener(v -> {
+                            showSongsForArtist(a.id);
+                        });
+
                         parent.addView(artistLayout);
                     }
                 }
@@ -285,6 +289,10 @@ public class MainActivity extends AppCompatActivity implements
                         albumName.setLines(2);
                         albumLayout.addView(albumName);
 
+                        albumLayout.setOnClickListener(v -> {
+                            showSongsForAlbum(a.id);
+                        });
+
                         parent.addView(albumLayout);
                     }
 
@@ -318,32 +326,44 @@ public class MainActivity extends AppCompatActivity implements
                 @Override
                 public void success(TracksPager tracksPager, Response response) {
                     LinearLayout parent = (LinearLayout) findViewById(R.id.tracks_layout);
-                    parent.removeAllViews();
-                    for (Track t : tracksPager.tracks.items) {
-                        Log.d("Found track", t.name);
-                        LinearLayout trackLayout = new LinearLayout(MainActivity.this);
-                        trackLayout.setPadding(20, 5, 20, 5);
-                        trackLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-                        trackLayout.setOrientation(LinearLayout.HORIZONTAL);
+                    try {
+                        parent.removeAllViews();
+                        for (Track t : tracksPager.tracks.items) {
+                            Log.d("Found track", t.name);
+                            LinearLayout trackLayout = new LinearLayout(MainActivity.this);
+                            trackLayout.setPadding(20, 5, 20, 5);
+                            trackLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                            trackLayout.setOrientation(LinearLayout.HORIZONTAL);
 
-                        TextView trackName = new TextView(MainActivity.this);
-                        trackName.setText(t.name);
-                        trackLayout.addView(trackName);
+                            TextView trackName = new TextView(MainActivity.this);
+                            trackName.setText(t.name);
+                            trackLayout.addView(trackName);
 
-                        TextView trackDuration = new TextView(MainActivity.this);
-                        int seconds = (int) t.duration_ms % 60000 / 1000;
-                        if (seconds < 10) {
-                            trackDuration.setText(t.duration_ms / 60000 + ":0" + seconds);
-                        } else {
-                            trackDuration.setText(t.duration_ms / 60000 + ":" + seconds);
+                            TextView trackDuration = new TextView(MainActivity.this);
+                            int seconds = (int) t.duration_ms % 60000 / 1000;
+                            if (seconds < 10) {
+                                trackDuration.setText(t.duration_ms / 60000 + ":0" + seconds);
+                            } else {
+                                trackDuration.setText(t.duration_ms / 60000 + ":" + seconds);
+                            }
+                            trackDuration.setLayoutParams(new ViewGroup.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                            trackDuration.setGravity(Gravity.END);
+                            trackLayout.addView(trackDuration);
+
+                            trackLayout.setOnClickListener(v -> {
+                                for (Track ta : tracksPager.tracks.items) {
+                                    queue = new ArrayList<>();
+                                    queue.add(ta);
+                                }
+                                for (int i = 0; i < queue.indexOf(t); i++) {
+                                    queue.remove(0);
+                                }
+                                playMusic("spotify:track:" + t.id, TYPE_TRACK);
+                            });
+
+                            parent.addView(trackLayout);
                         }
-                        trackDuration.setLayoutParams(new ViewGroup.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-                        trackDuration.setGravity(Gravity.END);
-                        trackLayout.addView(trackDuration);
-
-                        trackLayout.setOnClickListener(v -> playMusic("spotify:track:" + t.id, TYPE_TRACK));
-
-                        parent.addView(trackLayout);
+                    } catch (Exception ignored) {
                     }
 
                 }
@@ -354,6 +374,143 @@ public class MainActivity extends AppCompatActivity implements
                 }
             });
         }
+    }
+
+    // TODO: Build search layout programtically
+
+    private void showSongsForArtist(String id) {
+        SpotifyApi api = new SpotifyApi();
+        api.setAccessToken(getAccessToken());
+        SpotifyService spotify = api.getService();
+        spotify.getArtist(id, new Callback<Artist>() {
+            @Override
+            public void success(Artist artist, Response response) {
+                spotify.getArtistAlbums(artist.id, new Callback<Pager<Album>>() {
+                    @Override
+                    public void success(Pager<Album> albumPager, Response response) {
+                        clearLayout();
+                        LinearLayout artistLayout = new LinearLayout(MainActivity.itself);
+                        artistLayout.setOrientation(LinearLayout.VERTICAL);
+                        for (AlbumSimple a : albumPager.items) {
+                            if (a.album_type.equals("album") || a.album_type.equals("compilation"))
+                            Log.d("Found album", a.name);
+                            LinearLayout albumLayout = new LinearLayout(MainActivity.this);
+                            albumLayout.setPadding(10, 0, 10, 0);
+                            albumLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                            albumLayout.setOrientation(LinearLayout.VERTICAL);
+
+                            ImageView albumImage = new ImageView(MainActivity.this);
+                            try {
+                                setPictureFromUrl(albumImage, a.images.get(0).url);
+                            } catch (Exception e) {
+                                albumImage.setImageDrawable(getDrawable(android.R.drawable.ic_menu_agenda));
+                            }
+                            albumImage.setLayoutParams(new ViewGroup.LayoutParams(dpToPx(70), dpToPx(70)));
+                            albumLayout.addView(albumImage);
+
+                            TextView albumName = new TextView(MainActivity.this);
+                            albumName.setText(a.name);
+                            albumName.setLines(2);
+                            albumLayout.addView(albumName);
+
+                            albumLayout.setOnClickListener(v -> {
+                                showSongsForAlbum(a.id);
+                            });
+                            artistLayout.addView(albumLayout);
+                        }
+                        ScrollView verticalScrollView = (ScrollView) findViewById(R.id.verticalscrollview);
+                        verticalScrollView.addView(artistLayout);
+                    }
+
+                    private void setPictureFromUrl(ImageView albumImage, String url) {
+                        new Thread(() -> {
+                            try {
+                                Bitmap x;
+
+                                HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+                                connection.connect();
+
+                                InputStream input = connection.getInputStream();
+
+                                x = BitmapFactory.decodeStream(input);
+                                Drawable drawable = new BitmapDrawable(x);
+                                MainActivity.this.runOnUiThread(() -> albumImage.setImageDrawable(drawable));
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }).start();
+                    }
+
+                    @Override
+                    public void failure(RetrofitError error) {
+
+                    }
+                });
+            }
+
+            @Override
+            public void failure(RetrofitError error) {
+
+            }
+        });
+    }
+
+    private void showSongsForAlbum(String id) {
+        SpotifyApi api = new SpotifyApi();
+        api.setAccessToken(getAccessToken());
+        SpotifyService spotify = api.getService();
+        spotify.getAlbum(id, new Callback<Album>() {
+            @Override
+            public void success(Album album, Response response) {
+                clearLayout();
+                LinearLayout albumLayout = new LinearLayout(MainActivity.itself);
+                albumLayout.setOrientation(LinearLayout.VERTICAL);
+                for (TrackSimple t : album.tracks.items) {
+                    Log.d("Found track", t.name);
+                    LinearLayout trackLayout = new LinearLayout(MainActivity.this);
+                    trackLayout.setPadding(20, 5, 20, 5);
+                    trackLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    trackLayout.setOrientation(LinearLayout.HORIZONTAL);
+
+                    TextView trackName = new TextView(MainActivity.this);
+                    trackName.setText(t.name);
+                    trackLayout.addView(trackName);
+
+                    TextView trackDuration = new TextView(MainActivity.this);
+                    int seconds = (int) t.duration_ms % 60000 / 1000;
+                    if (seconds < 10) {
+                        trackDuration.setText(t.duration_ms / 60000 + ":0" + seconds);
+                    } else {
+                        trackDuration.setText(t.duration_ms / 60000 + ":" + seconds);
+                    }
+                    trackDuration.setLayoutParams(new ViewGroup.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    trackDuration.setGravity(Gravity.END);
+                    trackLayout.addView(trackDuration);
+
+                    trackLayout.setOnClickListener(v -> {
+                        queue = album.tracks.items;
+                        for (int i = 0; i < queue.indexOf(t); i++) {
+                            queue.remove(0);
+                        }
+                        playMusic("spotify:track:" + t.id, TYPE_TRACK);
+                    });
+
+                    albumLayout.addView(trackLayout);
+                }
+                ScrollView verticalScrollView = (ScrollView) findViewById(R.id.verticalscrollview);
+                verticalScrollView.addView(albumLayout);
+            }
+
+            @Override
+            public void failure(RetrofitError error) {
+
+            }
+        });
+    }
+
+    private void clearLayout() {
+        ScrollView verticalScrollView = (ScrollView) findViewById(R.id.verticalscrollview);
+        verticalScrollView.removeAllViews();
     }
 
     static MainActivity getContext() {
@@ -399,6 +556,9 @@ public class MainActivity extends AppCompatActivity implements
                 }
                 break;
             case R.id.skip_button:
+                playMusic("spotify:track:" + queue.get(0).id, TYPE_TRACK);
+                queue.remove(0);
+                /*
                 if (mPlayer.getPlaybackState().isPlaying) {
                     mPlayer.skipToNext(new Player.OperationCallback() {
                         @Override
@@ -408,7 +568,6 @@ public class MainActivity extends AppCompatActivity implements
 
                         @Override
                         public void onError(Error error) {
-
                         }
                     });
                 } else {
@@ -418,8 +577,6 @@ public class MainActivity extends AppCompatActivity implements
                             mPlayer.pause(new Player.OperationCallback() {
                                 @Override
                                 public void onSuccess() {
-                                    ImageView playButton = (ImageView) findViewById(R.id.play_button);
-                                    playButton.setImageDrawable(getDrawable(R.drawable.ic_action_name));
                                 }
 
                                 @Override
@@ -435,6 +592,7 @@ public class MainActivity extends AppCompatActivity implements
                         }
                     });
                 }
+                */
                 break;
             case R.id.go_back_button:
                 if (mPlayer.getPlaybackState().isPlaying) {
@@ -533,9 +691,11 @@ public class MainActivity extends AppCompatActivity implements
 
     }
 
-    static class RetrieveFeedTask extends AsyncTask<Object, Object, Map<String, String>> {
+    public String getUserId() {
+        return userId;
+    }
 
-        private Exception exception;
+    static class RetrieveFeedTask extends AsyncTask<Object, Object, Map<String, String>> {
 
         protected Map<String, String> doInBackground(Object... params) {
             Looper.prepare();
@@ -549,13 +709,10 @@ public class MainActivity extends AppCompatActivity implements
 
         protected void onPostExecute(Map<String, String> result) {
             if (result != null) {
-                Iterator it = result.entrySet().iterator();
-                while (it.hasNext()) {
-                    Map.Entry entry = (Map.Entry) it.next();
+                for (Object o : result.entrySet()) {
+                    Map.Entry entry = (Map.Entry) o;
                     System.out.println("Location Tag ID:" + dictionary.checkForTagId(entry));
                 }
-                // TODO: check this.exception
-                // TODO: do something with the feed
                 System.out.println("result " + result);
             }
         }
@@ -611,6 +768,14 @@ public class MainActivity extends AppCompatActivity implements
                     edit.putInt("AccessToken_ExpirationSeconds", response.getExpiresIn());
                     edit.putInt("AccessToken_StorageTime", (int) Calendar.getInstance().getTimeInMillis() / 1000);
                     edit.apply();
+                    new Thread(() -> {
+                        SpotifyApi api = new SpotifyApi();
+                        api.setAccessToken(accessToken);
+                        SpotifyService spotify = api.getService();
+                        userId = spotify.getMe().id;
+                        edit.putString("UserId", userId);
+                        edit.apply();
+                    }).start();
                     buildPlayer();
                     break;
 
@@ -721,16 +886,12 @@ public class MainActivity extends AppCompatActivity implements
                 case TYPE_PLAYLIST:
                     if (mPlayer != null) {
                         mPlayer.playUri(null, s, 0, 0);
-                        ImageView playButton = (ImageView) findViewById(R.id.play_button);
-                        playButton.setImageDrawable(getDrawable(R.drawable.ic_pause_button));
                         // PlaylistFragment.itself.setPlaylistGreen(s);
                     }
                     break;
                 default:
                     if (mPlayer != null) {
                         mPlayer.playUri(null, s, 0, 0);
-                        ImageView playButton = (ImageView) findViewById(R.id.play_button);
-                        playButton.setImageDrawable(getDrawable(R.drawable.ic_pause_button));
                     }
                     break;
             }
@@ -746,8 +907,6 @@ public class MainActivity extends AppCompatActivity implements
                     @Override
                     public void onSuccess() {
                         Log.d("MainActivity", "Resumes playing");
-                        ImageView playButton = (ImageView) findViewById(R.id.play_button);
-                        playButton.setImageDrawable(getDrawable(R.drawable.ic_pause_button));
                     }
 
                     @Override
@@ -788,8 +947,15 @@ public class MainActivity extends AppCompatActivity implements
                 ImageView playButton = (ImageView) findViewById(R.id.play_button);
                 playButton.setImageDrawable(getDrawable(R.drawable.ic_action_name));
                 break;
+            case kSpPlaybackNotifyTrackDelivered:
+                playMusic("spotify:track:" + queue.get(0).id, TYPE_TRACK);
+                queue.remove(0);
+                break;
             case kSpPlaybackNotifyPlay:
                 currentSong.play();
+                playButton = (ImageView) findViewById(R.id.play_button);
+                playButton.setImageDrawable(getDrawable(R.drawable.ic_pause_button));
+                break;
             default:
                 break;
         }
@@ -827,7 +993,7 @@ public class MainActivity extends AppCompatActivity implements
 
         void pause() {
             System.out.println("Pause called");
-            if (isPlaying){
+            if (isPlaying) {
                 endTimes.add(GregorianCalendar.getInstance().getTimeInMillis() / 1000);
                 isPlaying = false;
             }
@@ -919,19 +1085,19 @@ public class MainActivity extends AppCompatActivity implements
 
                         Date now = GregorianCalendar.getInstance().getTime();
                         String minutes;
-                        if (now.getMinutes() < 10){
+                        if (now.getMinutes() < 10) {
                             minutes = "0" + now.getMinutes();
                         } else {
                             minutes = String.valueOf(now.getMinutes());
                         }
                         String hours;
-                        if (now.getHours() < 10){
+                        if (now.getHours() < 10) {
                             hours = "0" + now.getHours();
                         } else {
                             hours = String.valueOf(now.getHours());
                         }
                         String timeString = now.getDay() + " " + hours + ":" + minutes;
-                        TrackRecord trackRecord = new TrackRecord(new UserRecord(age, gender), new ArtistRecord(artist.name, artistId, genres), new SongRecord(currentSong.name, trackId, danceability, energy, key, loudness, mode, speechiness, acousticness, instrumentalness, liveness, valence, tempo, duration, timeSignature), timeString, tagId, fractionListenedTo);
+                        TrackRecord trackRecord = new TrackRecord(new UserRecord(getUserId(), age, gender), new ArtistRecord(artist.name, artistId, genres), new SongRecord(currentSong.name, trackId, danceability, energy, key, loudness, mode, speechiness, acousticness, instrumentalness, liveness, valence, tempo, duration, timeSignature), timeString, tagId, fractionListenedTo);
 
                         if (mydb != null) {
                             mydb.insertTrackHistory(trackRecord);
@@ -1001,9 +1167,11 @@ public class MainActivity extends AppCompatActivity implements
 
     static class UserRecord {
         int Age;
+        String UserId;
         String Gender;
 
-        UserRecord(int age, String gender) {
+        UserRecord(String UserId, int age, String gender) {
+            this.UserId = UserId;
             this.Age = age;
             this.Gender = gender;
         }
@@ -1072,7 +1240,7 @@ public class MainActivity extends AppCompatActivity implements
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json;charset=UTF-8");
-                conn.setRequestProperty("Accept","application/json");
+                conn.setRequestProperty("Accept", "application/json");
                 conn.setDoOutput(true);
                 conn.setDoInput(true);
 
@@ -1085,9 +1253,9 @@ public class MainActivity extends AppCompatActivity implements
                 int responseCode = conn.getResponseCode();
                 String responseMessage = conn.getResponseMessage();
 
-                System.out.println(responseCode +": " + responseMessage);
+                System.out.println(responseCode + ": " + responseMessage);
 
-                if(responseCode == 201){
+                if (responseCode == 201) {
                     mydb.updateTrackRecords(sendTracksObject.listOfIdsOfUnsentRecords);
                 }
 
@@ -1098,7 +1266,7 @@ public class MainActivity extends AppCompatActivity implements
         }).start();
     }
 
-    class SendTracksObject{
+    class SendTracksObject {
         JSONArray listOfRecordsJsonArray;
         List<Integer> listOfIdsOfUnsentRecords;
 
@@ -1120,7 +1288,8 @@ public class MainActivity extends AppCompatActivity implements
                 JSONObject recordJson = new JSONObject(gson.toJson(t));
                 listOfRecordsJsonArray.put(recordJson);
             }
-        } catch (Exception ignored){}
+        } catch (Exception ignored) {
+        }
         SendTracksObject sendTracksObject = new SendTracksObject(listOfRecordsJsonArray, listOfIdsOfUnsentRecords);
         return sendTracksObject;
     }
