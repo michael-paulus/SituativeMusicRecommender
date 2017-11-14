@@ -43,6 +43,7 @@ public class DBHelper extends SQLiteOpenHelper {
     private static final String HISTORY_COLUMN_TRACKTIMESIGNATURE = "tracktimesignature";
     private static final String HISTORY_COLUMN_LOCATIONID = "locationid";
     private static final String HISTORY_COLUMN_WEIGHT = "weight";
+    private static final String HISTORY_COLUMN_SUGGESTIONVALUE = "suggestionvalue";
     private static final String HISTORY_COLUMN_TIMESTAMP = "timestamp";
     private static final String HISTORY_COLUMN_SENT = "sent";
     private static final String CREATE_HISTORY_TABLE = "create table " + HISTORY_TABLE_NAME + " (" +
@@ -57,13 +58,13 @@ public class DBHelper extends SQLiteOpenHelper {
             HISTORY_COLUMN_TRACKSPEECHINESS + " real, " + HISTORY_COLUMN_TRACKACOUSTICNESS + " real, " +
             HISTORY_COLUMN_TRACKINSTRUMENTALNESS + " real, " + HISTORY_COLUMN_TRACKLIVENESS + " real, " +
             HISTORY_COLUMN_TRACKVALENCE + " real, " + HISTORY_COLUMN_TRACKTEMPO + " real, " +
-            HISTORY_COLUMN_TRACKDURATION + " integer, " + HISTORY_COLUMN_TRACKTIMESIGNATURE + " integer," +
-            HISTORY_COLUMN_SENT + " integer)";
+            HISTORY_COLUMN_TRACKDURATION + " integer, " + HISTORY_COLUMN_TRACKTIMESIGNATURE + " integer, " +
+            HISTORY_COLUMN_SENT + " integer, " + HISTORY_COLUMN_SUGGESTIONVALUE + " real)";
     private HashMap hp;
     private List<Integer> unsentTrackRecordsIds;
 
     DBHelper(Context context) {
-        super(context, DATABASE_NAME, null, 7);
+        super(context, DATABASE_NAME, null, 8);
     }
 
     @Override
@@ -106,6 +107,7 @@ public class DBHelper extends SQLiteOpenHelper {
         contentValues.put(HISTORY_COLUMN_TRACKTEMPO, trackRecord.Track.Tempo);
         contentValues.put(HISTORY_COLUMN_TRACKDURATION, trackRecord.Track.Duration);
         contentValues.put(HISTORY_COLUMN_TRACKTIMESIGNATURE, trackRecord.Track.Time_Signature);
+        contentValues.put(HISTORY_COLUMN_SUGGESTIONVALUE, trackRecord.SuggestionValue);
         contentValues.put(HISTORY_COLUMN_SENT, 0);
         db.insert(HISTORY_TABLE_NAME, null, contentValues);
     }
@@ -178,7 +180,8 @@ public class DBHelper extends SQLiteOpenHelper {
                             mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_TRACKTIMESIGNATURE))),
                     mCursor.getString(mCursor.getColumnIndex(HISTORY_COLUMN_TIMESTAMP)),
                     mCursor.getInt(mCursor.getColumnIndex(HISTORY_COLUMN_LOCATIONID)),
-                    mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_WEIGHT))));
+                    mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_WEIGHT)),
+                    mCursor.getFloat(mCursor.getColumnIndex(HISTORY_COLUMN_SUGGESTIONVALUE))));
         }
         System.out.println(trackRecords.toString());
         return trackRecords;

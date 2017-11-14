@@ -22,21 +22,48 @@
             android:id="@+id/search_text"
             android:layout_width="match_parent"
             android:layout_height="50dp"
-            android:hint="Search" />
+            android:hint="Search"
+            android:onClick="onClick"/>
 
-        <Button
-            android:id="@+id/Button"
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:onClick="onClick"
-            android:text="@string/create_database" />
+            android:layout_height="wrap_content">
 
-        <Button
-            android:id="@+id/Button3"
+            <Button
+                android:id="@+id/Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClick"
+                android:text="@string/create_database" />
+
+            <Button
+                android:id="@+id/Button3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClick"
+                android:text="Send Records" />
+
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:onClick="onClick"
-            android:text="Send Records" />
+            android:layout_height="wrap_content">
+
+            <Button
+                android:id="@+id/Button4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClick"
+                android:text="Get Recommendation" />
+
+            <Button
+                android:id="@+id/Button5"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClick"
+                android:text="Get Location Tag ID" />
+
+        </LinearLayout>
     </LinearLayout>
 
     <ScrollView
