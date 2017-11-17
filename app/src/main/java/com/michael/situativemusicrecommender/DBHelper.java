@@ -64,7 +64,7 @@ public class DBHelper extends SQLiteOpenHelper {
     private List<Integer> unsentTrackRecordsIds;
 
     DBHelper(Context context) {
-        super(context, DATABASE_NAME, null, 8);
+        super(context, DATABASE_NAME, null, 9);
     }
 
     @Override

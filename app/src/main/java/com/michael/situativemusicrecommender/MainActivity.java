@@ -39,6 +39,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
+import com.loopj.android.http.HttpGet;
 import com.spotify.sdk.android.authentication.AuthenticationClient;
 import com.spotify.sdk.android.authentication.AuthenticationRequest;
 import com.spotify.sdk.android.authentication.AuthenticationResponse;
@@ -52,14 +53,19 @@ import com.spotify.sdk.android.player.Spotify;
 import com.spotify.sdk.android.player.SpotifyPlayer;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.xml.sax.SAXException;
 
+import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -70,6 +76,11 @@ import java.util.Map;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import cz.msebera.android.httpclient.HttpResponse;
+import cz.msebera.android.httpclient.client.ClientProtocolException;
+import cz.msebera.android.httpclient.client.HttpClient;
+import cz.msebera.android.httpclient.impl.client.DefaultHttpClient;
+import cz.msebera.android.httpclient.util.EntityUtils;
 import kaaes.spotify.webapi.android.SpotifyApi;
 import kaaes.spotify.webapi.android.SpotifyService;
 import kaaes.spotify.webapi.android.models.Album;
@@ -382,13 +393,14 @@ public class MainActivity extends AppCompatActivity implements
                                 for (int i = index; i < tracksPager.tracks.items.size(); i++){
                                     queue.add(new Suggestion(tracksPager.tracks.items.get(i), -1f));
                                 }
+                                lastPlayed.add(new Suggestion(t, -1f));
                                 playMusic("spotify:track:" + t.id, TYPE_TRACK);
                             });
 
                             parent.addView(trackLayout);
                         }
                         scrollViewWrapper.addView(parent);
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) {e.printStackTrace();}
                 }
 
                 @Override
@@ -520,6 +532,7 @@ public class MainActivity extends AppCompatActivity implements
                         for (int i = index; i < album.tracks.items.size(); i++){
                             queue.add(new Suggestion(album.tracks.items.get(i), -1f));
                         }
+                        lastPlayed.add(new Suggestion(t, -1f));
                         playMusic("spotify:track:" + t.id, TYPE_TRACK);
                     });
 
@@ -598,9 +611,15 @@ public class MainActivity extends AppCompatActivity implements
                 }
                 break;
             case R.id.skip_button:
-                playMusic("spotify:track:" + queue.get(0).track.id, TYPE_TRACK);
-                lastPlayed.add(queue.get(0));
-                queue.remove(0);
+                if (queue.size() > 0) {
+                    playMusic("spotify:track:" + queue.get(0).track.id, TYPE_TRACK);
+                    lastPlayed.add(queue.get(0));
+                    queue.remove(0);
+                } else {
+                    mPlayer.pause(null);
+                    mPlayer.seekToPosition(null, 0);
+                    finishCurrentSong();
+                }
                 /*
                 if (mPlayer.getPlaybackState().isPlaying) {
                     mPlayer.skipToNext(new Player.OperationCallback() {
@@ -985,16 +1004,20 @@ public class MainActivity extends AppCompatActivity implements
                 break;
             // Handle event type as necessary
             case kSpPlaybackNotifyPause:
-                currentSong.pause();
-                metadata = mPlayer.getMetadata();
-                Log.d("Paused Track", metadata.toString());
+                if (currentSong != null) {
+                    currentSong.pause();
+                    metadata = mPlayer.getMetadata();
+                    Log.d("Paused Track", metadata.toString());
+                }
                 ImageView playButton = (ImageView) findViewById(R.id.play_button);
                 playButton.setImageDrawable(getDrawable(R.drawable.ic_action_name));
                 break;
             case kSpPlaybackNotifyTrackDelivered:
-                playMusic("spotify:track:" + queue.get(0).track.id, TYPE_TRACK);
-                lastPlayed.add(queue.get(0));
-                queue.remove(0);
+                if (queue.size()>0){
+                    playMusic("spotify:track:" + queue.get(0).track.id, TYPE_TRACK);
+                    lastPlayed.add(queue.get(0));
+                    queue.remove(0);
+                }
                 break;
             case kSpPlaybackNotifyPlay:
                 currentSong.play();
@@ -1074,7 +1097,8 @@ public class MainActivity extends AppCompatActivity implements
             System.out.println("Suggestion value for track " + lastPlayed.get(lastPlayed.size()-1).track.name + " was " + lastPlayed.get(lastPlayed.size()-1).suggestionValue);
             stackSong(currentSong, fractionListenedTo, lastPlayed.get(lastPlayed.size()-1).suggestionValue);
             currentSong = null;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -1336,15 +1360,61 @@ public class MainActivity extends AppCompatActivity implements
                 JSONObject recordJson = new JSONObject(gson.toJson(t));
                 listOfRecordsJsonArray.put(recordJson);
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         SendTracksObject sendTracksObject = new SendTracksObject(listOfRecordsJsonArray, listOfIdsOfUnsentRecords);
         return sendTracksObject;
     }
 
     private void getSuggestion(){
-        // TODO: Build a get request to the server with this users id as parameter
-        // TODO: Receive a list of songs that are suggestions
-        // TODO: insert that list of recommendations into the query and play the query.
+        new Thread(() ->{
+            HttpResponse response = null;
+            try {
+                // Ask for recommendations
+                HttpClient client = new DefaultHttpClient();
+                HttpGet request = new HttpGet();
+                request.setURI(new URI(getString(R.string.home_server_url_get_recommendations) + getUserId()));
+                response = client.execute(request);
+                String responseContent = EntityUtils.toString(response.getEntity());
+                System.out.println(responseContent);
+                try {
+                    // Interpret the result
+                    JSONObject jobj = new JSONObject(responseContent);
+                    System.out.println(jobj.toString());
+                    JSONArray suggestions = jobj.getJSONArray("records");
+                    // Add each suggestion to the queue
+                    for (int i = 0; i< suggestions.length(); i++){
+                        JSONObject recommendation = suggestions.getJSONObject(i);
+                        String id = recommendation.getString("id");
+                        float suggestionValue = recommendation.getInt("suggestion_value");
+                        queue = new ArrayList<>();
+                        SpotifyApi api = new SpotifyApi();
+                        accessToken = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", "");
+                        if (!accessToken.equals("")) {
+                            api.setAccessToken(PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", ""));
+                            SpotifyService spotify = api.getService();
+                            queue.add(new Suggestion(spotify.getTrack(id), suggestionValue));
+                        }
+                    }
+                    // Start the queue
+                    playMusic("spotify:track:" + queue.get(0).track.id, TYPE_TRACK);
+                    lastPlayed.add(queue.get(0));
+                    queue.remove(0);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    makeToast("The server seems to be talking gibberish...");
+                }
+            } catch (URISyntaxException | IOException e) {
+                e.printStackTrace();
+                makeToast("Whoops! The server seems to be down.");
+            }
+        }).start();
+    }
+
+    private void makeToast(String s) {
+        this.runOnUiThread(() ->
+            Toast.makeText(getApplicationContext(), s,
+                    Toast.LENGTH_SHORT).show());
     }
 }
