@@ -71,6 +71,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -117,6 +118,21 @@ public class MainActivity extends AppCompatActivity implements
     private String userId;
     private List<Suggestion> queue;
     private List<Suggestion> lastPlayed;
+
+    public int getHours() {
+        Calendar c = GregorianCalendar.getInstance();
+        return c.getTime().getHours();
+    }
+
+    public int getMinutes() {
+        Calendar c = GregorianCalendar.getInstance();
+        return c.getTime().getMinutes();
+    }
+
+    public int getDay() {
+        Calendar c = GregorianCalendar.getInstance();
+        return c.getTime().getDay();
+    }
 
     class Suggestion{
         TrackSimple track;
@@ -703,6 +719,26 @@ public class MainActivity extends AppCompatActivity implements
 
     private void getLocationType() {
         new RetrieveFeedTask().execute();
+    }
+
+    private int getLocationId() {
+        try {
+        Map<String, String> result = OSMWrapperAPI.getLocationType();
+        if (result != null) {
+            int locationId = 0;
+            for (Object o : result.entrySet()) {
+                Map.Entry entry = (Map.Entry) o;
+                System.out.println("Location Tag ID:" + dictionary.checkForTagId(entry));
+                locationId = dictionary.checkForTagId(entry);
+                if (locationId != 0){
+                    return locationId;
+                }
+            }
+        }
+        } catch (IOException | SAXException | ParserConfigurationException e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 
     public double getLatitude() {
@@ -1367,14 +1403,17 @@ public class MainActivity extends AppCompatActivity implements
         return sendTracksObject;
     }
 
-    private void getSuggestion(){
-        new Thread(() ->{
+    // TODO: Add situation identifier variables to get request (like time, location right now)
+    private void getSuggestion() {
+        new Thread(() -> {
             HttpResponse response = null;
             try {
                 // Ask for recommendations
                 HttpClient client = new DefaultHttpClient();
                 HttpGet request = new HttpGet();
-                request.setURI(new URI(getString(R.string.home_server_url_get_recommendations) + getUserId()));
+                accessToken = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", "");
+                request.setURI(new URI(getString(R.string.home_server_url_get_recommendations) + getUserId() + "?location_id=" + getLocationId() + "&day=" + getDay() + "&hours=" + getHours() + "&minutes=" + getMinutes() + "&accesstoken=" + accessToken));
+                System.out.println(request.getURI());
                 response = client.execute(request);
                 String responseContent = EntityUtils.toString(response.getEntity());
                 System.out.println(responseContent);
@@ -1384,7 +1423,7 @@ public class MainActivity extends AppCompatActivity implements
                     System.out.println(jobj.toString());
                     JSONArray suggestions = jobj.getJSONArray("records");
                     // Add each suggestion to the queue
-                    for (int i = 0; i< suggestions.length(); i++){
+                    for (int i = 0; i < suggestions.length(); i++) {
                         JSONObject recommendation = suggestions.getJSONObject(i);
                         String id = recommendation.getString("id");
                         float suggestionValue = recommendation.getInt("suggestion_value");
