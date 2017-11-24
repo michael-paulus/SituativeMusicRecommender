@@ -39,6 +39,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import com.loopj.android.http.HttpGet;
 import com.spotify.sdk.android.authentication.AuthenticationClient;
 import com.spotify.sdk.android.authentication.AuthenticationRequest;
@@ -69,6 +72,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -975,6 +979,10 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     void playMusic(String s, String type) {
+        System.out.println("Queue:");
+        for (Suggestion sug: queue){
+            System.out.println(sug.track.name + ": " + sug.suggestionValue);
+        }
         if (mPlayer.getMetadata().contextUri == null || !mPlayer.getMetadata().contextUri.equals(s)) {
             Intent i = new Intent("com.android.music.musicservicecommand");
             i.putExtra("command", "pause");
@@ -1133,6 +1141,7 @@ public class MainActivity extends AppCompatActivity implements
             System.out.println("Suggestion value for track " + lastPlayed.get(lastPlayed.size()-1).track.name + " was " + lastPlayed.get(lastPlayed.size()-1).suggestionValue);
             stackSong(currentSong, fractionListenedTo, lastPlayed.get(lastPlayed.size()-1).suggestionValue);
             currentSong = null;
+            sendRecords();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1154,13 +1163,17 @@ public class MainActivity extends AppCompatActivity implements
                         System.out.println(genres.toString());
 
                         int tagId = 0;
-                        Map<String, String> locationIds = OSMWrapperAPI.getLocationType();
-                        if (locationIds != null) {
-                            for (Object o : locationIds.entrySet()) {
-                                Map.Entry entry = (Map.Entry) o;
-                                tagId = dictionary.checkForTagId(entry);
-                                System.out.println("Location Tag ID:" + tagId);
+                        try {
+                            Map<String, String> locationIds = OSMWrapperAPI.getLocationType();
+                            if (locationIds != null) {
+                                for (Object o : locationIds.entrySet()) {
+                                    Map.Entry entry = (Map.Entry) o;
+                                    tagId = dictionary.checkForTagId(entry);
+                                    System.out.println("Location Tag ID:" + tagId);
+                                }
                             }
+                        } catch (Exception e){
+                            tagId = 0;
                         }
                         System.out.println(tagId);
 
@@ -1211,7 +1224,7 @@ public class MainActivity extends AppCompatActivity implements
                         // Quick check if there are any unsent records.
                         mydb.getUnsentTrackRecords();
                     }
-                } catch (IOException | SAXException | ParserConfigurationException e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }).start();
@@ -1344,13 +1357,22 @@ public class MainActivity extends AppCompatActivity implements
                 sendToServerObject.put("Track_History", listOfRecords);
 
                 System.out.println("Sending: " + sendToServerObject.toString());
+                Gson gson = new GsonBuilder().setPrettyPrinting().create();
+                JsonParser jp = new JsonParser();
+                JsonElement je = jp.parse(sendToServerObject.toString());
+                String prettyJsonString = gson.toJson(je);
+                System.out.println(prettyJsonString);
 
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json;charset=UTF-8");
-                conn.setRequestProperty("Accept", "application/json");
+                conn.setRequestProperty("Content-Type", "application/json");//; charset=UTF-8");
+                conn.setRequestProperty("Accept", "*/*");
+                conn.setRequestProperty("Cache-Control", "no-cache");
+                conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
                 conn.setDoOutput(true);
                 conn.setDoInput(true);
+
+                conn.connect();
 
                 DataOutputStream os = new DataOutputStream(conn.getOutputStream());
                 os.writeBytes(sendToServerObject.toString());
@@ -1365,6 +1387,8 @@ public class MainActivity extends AppCompatActivity implements
 
                 if (responseCode == 201) {
                     mydb.updateTrackRecords(sendTracksObject.listOfIdsOfUnsentRecords);
+                } else {
+                    System.out.println(convertStreamToString(conn.getErrorStream()));
                 }
 
                 conn.disconnect();
@@ -1372,6 +1396,27 @@ public class MainActivity extends AppCompatActivity implements
                 e.printStackTrace();
             }
         }).start();
+    }
+
+    private String convertStreamToString(InputStream is) {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+        StringBuilder sb = new StringBuilder();
+
+        String line = null;
+        try {
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append('\n');
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                is.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return sb.toString();
     }
 
     class SendTracksObject {
@@ -1403,7 +1448,6 @@ public class MainActivity extends AppCompatActivity implements
         return sendTracksObject;
     }
 
-    // TODO: Add situation identifier variables to get request (like time, location right now)
     private void getSuggestion() {
         new Thread(() -> {
             HttpResponse response = null;
@@ -1423,11 +1467,12 @@ public class MainActivity extends AppCompatActivity implements
                     System.out.println(jobj.toString());
                     JSONArray suggestions = jobj.getJSONArray("records");
                     // Add each suggestion to the queue
+                    queue = new ArrayList<>();
                     for (int i = 0; i < suggestions.length(); i++) {
                         JSONObject recommendation = suggestions.getJSONObject(i);
                         String id = recommendation.getString("id");
                         float suggestionValue = recommendation.getInt("suggestion_value");
-                        queue = new ArrayList<>();
+                        System.out.println(id + ": " + suggestionValue);
                         SpotifyApi api = new SpotifyApi();
                         accessToken = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", "");
                         if (!accessToken.equals("")) {
@@ -1436,9 +1481,12 @@ public class MainActivity extends AppCompatActivity implements
                             queue.add(new Suggestion(spotify.getTrack(id), suggestionValue));
                         }
                     }
+                    // Shuffling to sprinkle in some stuff here and there
+                    Collections.shuffle(queue);
                     // Start the queue
                     playMusic("spotify:track:" + queue.get(0).track.id, TYPE_TRACK);
                     lastPlayed.add(queue.get(0));
+                    System.out.println(queue.toString());
                     queue.remove(0);
                 } catch (JSONException e) {
                     e.printStackTrace();
