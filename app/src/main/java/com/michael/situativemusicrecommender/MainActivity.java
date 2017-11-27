@@ -2,6 +2,7 @@ package com.michael.situativemusicrecommender;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -22,6 +23,7 @@ import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -608,6 +610,12 @@ public class MainActivity extends AppCompatActivity implements
                     getLocationType();
                 }
                 break;
+            case R.id.Button6:
+                askForAge(false);
+                break;
+            case R.id.Button7:
+                askForGender(false);
+                break;
             case R.id.search_text:
                 EditText searchText = (EditText) view;
                 searchText.setCursorVisible(true);
@@ -719,6 +727,98 @@ public class MainActivity extends AppCompatActivity implements
             default:
                 break;
         }
+    }
+
+    private void askForGender(boolean misused) {
+        AlertDialog.Builder alert = new AlertDialog.Builder(this);
+
+        alert.setTitle("Please input your gender");
+        alert.setMessage("Giving us your gender helps us improve our recommendations!");
+        if (misused){
+            alert.setTitle("Please input your gender");
+            alert.setMessage("Please input yor gender as either male or female.");
+        }
+
+// Set an EditText view to get user input
+        final EditText input = new EditText(this);
+        alert.setView(input);
+
+        alert.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                String value = input.getText().toString();
+                // Do something with value!
+                if (!value.equals("male")&&!value.equals("female")){
+                    askForGender(true);
+                } else{
+                    SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(MainActivity.itself);
+                    SharedPreferences.Editor edit = pref.edit();
+                    edit.putString("Gender", value);
+                    edit.apply();
+                }
+            }
+        });
+
+        alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                // Canceled.
+            }
+        });
+
+        alert.show();
+    }
+
+    private void askForAge(boolean misused) {
+        AlertDialog.Builder alert = new AlertDialog.Builder(this);
+
+        alert.setTitle("Please input your age");
+        alert.setMessage("Giving us your age helps us improve our recommendations!");
+        if (misused) {
+            alert.setTitle("Please input your age");
+            alert.setMessage("Please input your age as a whole number.");
+        }
+
+// Set an EditText view to get user input
+        final EditText input = new EditText(this);
+        alert.setView(input);
+
+        alert.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                String value = input.getText().toString();
+                // Do something with value!
+                if (!isInteger(value)){
+                    askForAge(true);
+                } else{
+                    SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(MainActivity.itself);
+                    SharedPreferences.Editor edit = pref.edit();
+                    edit.putInt("Age", Integer.valueOf(value));
+                    edit.apply();
+                }
+            }
+        });
+
+        alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                // Canceled.
+            }
+        });
+
+        alert.show();
+    }
+
+    public static boolean isInteger(String s) {
+        return isInteger(s,10);
+    }
+
+    public static boolean isInteger(String s, int radix) {
+        if(s.isEmpty()) return false;
+        for(int i = 0; i < s.length(); i++) {
+            if(i == 0 && s.charAt(i) == '-') {
+                if(s.length() == 1) return false;
+                else continue;
+            }
+            if(Character.digit(s.charAt(i),radix) < 0) return false;
+        }
+        return true;
     }
 
     private void getLocationType() {
@@ -1141,7 +1241,6 @@ public class MainActivity extends AppCompatActivity implements
             System.out.println("Suggestion value for track " + lastPlayed.get(lastPlayed.size()-1).track.name + " was " + lastPlayed.get(lastPlayed.size()-1).suggestionValue);
             stackSong(currentSong, fractionListenedTo, lastPlayed.get(lastPlayed.size()-1).suggestionValue);
             currentSong = null;
-            sendRecords();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1223,6 +1322,7 @@ public class MainActivity extends AppCompatActivity implements
                         }
                         // Quick check if there are any unsent records.
                         mydb.getUnsentTrackRecords();
+                        sendRecords();
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
