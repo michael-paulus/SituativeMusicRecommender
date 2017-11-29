@@ -19,6 +19,7 @@ import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.support.v4.app.ActivityCompat;
@@ -36,6 +37,7 @@ import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -118,6 +120,7 @@ public class MainActivity extends AppCompatActivity implements
     static String accessToken;
     private Player mPlayer;
     static MainActivity itself;
+    private Handler mHandler;
 
     public static final String REDIRECT_URI = "michael-situativemusicrecommender://callback";
     private DBHelper mydb;
@@ -130,9 +133,9 @@ public class MainActivity extends AppCompatActivity implements
         return c.getTime().getHours();
     }
 
-    public int getMinutes() {
+    public int getMonth() {
         Calendar c = GregorianCalendar.getInstance();
-        return c.getTime().getMinutes();
+        return c.getTime().getMonth();
     }
 
     public int getDay() {
@@ -217,6 +220,20 @@ public class MainActivity extends AppCompatActivity implements
     private void prepLayout() {
         final EditText edittext = (EditText) findViewById(R.id.search_text);
         edittext.setSingleLine(true);
+        mHandler = new Handler();
+        Runnable UpdateProgressBarRunnable = new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("Progress bar updater has been called");
+                if (currentSong != null) {
+                    ProgressBar progressBar = (ProgressBar) findViewById(R.id.progressBar);
+                    progressBar.setMax((int) mPlayer.getMetadata().currentTrack.durationMs);
+                    progressBar.setProgress((int) mPlayer.getPlaybackState().positionMs);
+                }
+                mHandler.postDelayed(this, 500);
+            }
+        };
+        mHandler.postDelayed(UpdateProgressBarRunnable, 500);
         edittext.setOnKeyListener((v, keyCode, event) -> {
             // If the event is a Key-down event on the "enter" button
             if ((event.getAction() == KeyEvent.ACTION_DOWN) &&
@@ -1302,11 +1319,11 @@ public class MainActivity extends AppCompatActivity implements
                         int duration = audioFeatures.duration_ms;
 
                         Date now = GregorianCalendar.getInstance().getTime();
-                        String minutes;
-                        if (now.getMinutes() < 10) {
-                            minutes = "0" + now.getMinutes();
+                        String month;
+                        if (now.getMonth() < 10) {
+                            month = "0" + now.getMonth();
                         } else {
-                            minutes = String.valueOf(now.getMinutes());
+                            month = String.valueOf(now.getMonth());
                         }
                         String hours;
                         if (now.getHours() < 10) {
@@ -1314,7 +1331,7 @@ public class MainActivity extends AppCompatActivity implements
                         } else {
                             hours = String.valueOf(now.getHours());
                         }
-                        String timeString = now.getDay() + " " + hours + ":" + minutes;
+                        String timeString = month + " " + now.getDay() + " " + hours;
                         TrackRecord trackRecord = new TrackRecord(new UserRecord(getUserId(), age, gender), new ArtistRecord(artist.name, artistId, genres), new SongRecord(currentSong.name, trackId, danceability, energy, key, loudness, mode, speechiness, acousticness, instrumentalness, liveness, valence, tempo, duration, timeSignature), timeString, tagId, fractionListenedTo, suggestionValue);
 
                         if (mydb != null) {
@@ -1556,7 +1573,7 @@ public class MainActivity extends AppCompatActivity implements
                 HttpClient client = new DefaultHttpClient();
                 HttpGet request = new HttpGet();
                 accessToken = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", "");
-                request.setURI(new URI(getString(R.string.home_server_url_get_recommendations) + getUserId() + "?location_id=" + getLocationId() + "&day=" + getDay() + "&hours=" + getHours() + "&minutes=" + getMinutes() + "&accesstoken=" + accessToken));
+                request.setURI(new URI(getString(R.string.home_server_url_get_recommendations) + getUserId() + "?location_id=" + getLocationId() + "&day=" + getDay() + "&hours=" + getHours() + "&month=" + getMonth() + "&accesstoken=" + accessToken));
                 System.out.println(request.getURI());
                 response = client.execute(request);
                 String responseContent = EntityUtils.toString(response.getEntity());
