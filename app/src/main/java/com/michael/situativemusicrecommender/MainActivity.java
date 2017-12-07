@@ -26,6 +26,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
@@ -74,6 +75,8 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -224,11 +227,14 @@ public class MainActivity extends AppCompatActivity implements
         Runnable UpdateProgressBarRunnable = new Runnable() {
             @Override
             public void run() {
-                System.out.println("Progress bar updater has been called");
                 if (currentSong != null) {
-                    ProgressBar progressBar = (ProgressBar) findViewById(R.id.progressBar);
-                    progressBar.setMax((int) mPlayer.getMetadata().currentTrack.durationMs);
-                    progressBar.setProgress((int) mPlayer.getPlaybackState().positionMs);
+                    try {
+                        ProgressBar progressBar = (ProgressBar) findViewById(R.id.progressBar);
+                        progressBar.setMax((int) mPlayer.getMetadata().currentTrack.durationMs);
+                        progressBar.setProgress((int) mPlayer.getPlaybackState().positionMs);
+                    } catch (Exception e){
+                        e.printStackTrace();
+                    }
                 }
                 mHandler.postDelayed(this, 500);
             }
@@ -249,8 +255,6 @@ public class MainActivity extends AppCompatActivity implements
             }
             return false;
         });
-
-
     }
 
     public int dpToPx(int dp) {
@@ -1473,6 +1477,8 @@ public class MainActivity extends AppCompatActivity implements
                 JSONObject sendToServerObject = new JSONObject();
                 sendToServerObject.put("Track_History", listOfRecords);
 
+                //String messageToServer = sendToServerObject.toString().replaceAll("\/", "\\\/");
+
                 System.out.println("Sending: " + sendToServerObject.toString());
                 Gson gson = new GsonBuilder().setPrettyPrinting().create();
                 JsonParser jp = new JsonParser();
@@ -1482,7 +1488,7 @@ public class MainActivity extends AppCompatActivity implements
 
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");//; charset=UTF-8");
+                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
                 conn.setRequestProperty("Accept", "*/*");
                 conn.setRequestProperty("Cache-Control", "no-cache");
                 conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
@@ -1491,8 +1497,13 @@ public class MainActivity extends AppCompatActivity implements
 
                 conn.connect();
 
+                String toSendString = Normalizer.normalize(sendToServerObject.toString(), Normalizer.Form.NFD).replaceAll("[^\\p{ASCII}]", "");
+                toSendString = toSendString.replace("&", "");
+
+                System.out.println(toSendString);
+
                 DataOutputStream os = new DataOutputStream(conn.getOutputStream());
-                os.writeBytes(sendToServerObject.toString());
+                os.writeBytes(toSendString);
 
                 os.flush();
                 os.close();
@@ -1601,10 +1612,12 @@ public class MainActivity extends AppCompatActivity implements
                     // Shuffling to sprinkle in some stuff here and there
                     Collections.shuffle(queue);
                     // Start the queue
-                    playMusic("spotify:track:" + queue.get(0).track.id, TYPE_TRACK);
-                    lastPlayed.add(queue.get(0));
-                    System.out.println(queue.toString());
-                    queue.remove(0);
+                    if (queue.size() > 0) {
+                        playMusic("spotify:track:" + queue.get(0).track.id, TYPE_TRACK);
+                        lastPlayed.add(queue.get(0));
+                        System.out.println(queue.toString());
+                        queue.remove(0);
+                    }
                 } catch (JSONException e) {
                     e.printStackTrace();
                     makeToast("The server seems to be talking gibberish...");

@@ -149,6 +149,7 @@ public class dictionary {
                         type = 10;
                         break;
                     case "nightclub":
+                    case "festival_grounds":
                         type = 11;
                         break;
                     case "place_of_worship":
