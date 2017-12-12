@@ -85,6 +85,7 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -627,9 +628,7 @@ public class MainActivity extends AppCompatActivity implements
                 }
                 break;
             case R.id.Button5:
-                if (isNetworkAvailable()){
-                    getLocationType();
-                }
+                askForIp();
                 break;
             case R.id.Button6:
                 askForAge(false);
@@ -748,6 +747,44 @@ public class MainActivity extends AppCompatActivity implements
             default:
                 break;
         }
+    }
+
+    private void askForIp() {
+        AlertDialog.Builder alert = new AlertDialog.Builder(this);
+
+        String REGEX_IPADDRESS = "((\\d+\\.){3}\\d+):(\\d+)";
+
+        alert.setTitle("Please input the server IP");
+        alert.setMessage("Please input the server IP in the form of XXX.XXX.XXX.XXX:PPPP");
+
+// Set an EditText view to get user input
+        final EditText input = new EditText(this);
+        alert.setView(input);
+
+        alert.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                String value = input.getText().toString();
+                // Do something with value!
+                if(!value.matches(REGEX_IPADDRESS)) {
+                    askForIp();
+                } else{
+                    SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(MainActivity.itself);
+                    SharedPreferences.Editor edit = pref.edit();
+                    edit.putString("ServerIp", value);
+                    edit.apply();
+                    makeToast("Server IP successfully set!");
+                }
+            }
+        });
+
+        alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                // Canceled.
+            }
+        });
+
+        alert.show();
+
     }
 
     private void askForGender(boolean misused) {
@@ -1471,7 +1508,9 @@ public class MainActivity extends AppCompatActivity implements
         new Thread(() -> {
             try {
                 System.out.println("Building the http request");
-                URL url = new URL(getString(R.string.home_server_url_send_records));
+                SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(MainActivity.itself);
+                String serverAddress = "http://" + pref.getString("ServerIp", getString(R.string.home_server_url)) + "/send_records";
+                URL url = new URL(serverAddress);
                 SendTracksObject sendTracksObject = buildRecordsJson();
                 JSONArray listOfRecords = sendTracksObject.listOfRecordsJsonArray;
                 JSONObject sendToServerObject = new JSONObject();
@@ -1584,7 +1623,9 @@ public class MainActivity extends AppCompatActivity implements
                 HttpClient client = new DefaultHttpClient();
                 HttpGet request = new HttpGet();
                 accessToken = PreferenceManager.getDefaultSharedPreferences(MainActivity.this).getString("AccessToken", "");
-                request.setURI(new URI(getString(R.string.home_server_url_get_recommendations) + getUserId() + "?location_id=" + getLocationId() + "&day=" + getDay() + "&hours=" + getHours() + "&month=" + getMonth() + "&accesstoken=" + accessToken));
+                SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(MainActivity.itself);
+                String serverAddress = "http://" + pref.getString("ServerIp", getString(R.string.home_server_url)) + "/get_recommendations/";
+                request.setURI(new URI(serverAddress + getUserId() + "?location_id=" + getLocationId() + "&day=" + getDay() + "&hours=" + getHours() + "&month=" + getMonth() + "&accesstoken=" + accessToken));
                 System.out.println(request.getURI());
                 response = client.execute(request);
                 String responseContent = EntityUtils.toString(response.getEntity());

@@ -1,6 +1,5 @@
 <resources>
     <string name="app_name">Situative Music Recommender</string>
     <string name="create_database">Login to Spotify</string>
-    <string name="home_server_url_send_records">http://192.168.178.28:5002/send_records</string>
-    <string name="home_server_url_get_recommendations">http://192.168.178.28:5002/get_recommendations/</string>
+    <string name="home_server_url">http://192.168.178.28:5002</string>
 </resources>
